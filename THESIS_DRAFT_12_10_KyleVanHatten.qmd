@@ -1,0 +1,2480 @@
+---
+title: "From Betting Lines to Bottom Lines: Improving MMA Fight Outcome Forecasts with Advanced Analytics"
+subtitle: "Exploring Pre-Fight Analytics and Market Effiency in the UFC"
+author: "Kyle VanHatten"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+format: 
+  pdf:
+    documentclass: article
+    toc: false
+    number-sections: false
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+header-includes:
+  - \usepackage{array}
+---
+
+# ABSTRACT
+
+This paper examines whether incorporating novel variables and analytical methods can improve the prediction of mixed martial arts (MMA) fight outcomes beyond what is implied by betting odds. We begin by cleaning and merging multiple data sources, ensuring a high-quality dataset for analysis. Using feature engineering, we create variables to capture fighter styles, activity levels, finishing abilities, and latent factors through factor analysis. These new variables are incorporated into logistic regression, discriminant analysis, and machine learning models, including random forests and XGBoost. Compared to a baseline model using only the betting odds, our “super” model, which includes these novel predictors, demonstrates statistically significant improvements in predictive accuracy. We conduct cross-validation and likelihood ratio tests, confirming that the added complexity yields robust and meaningful gains. Random forest and XGBoost feature importance measures highlight the value of stylistic and performance-related attributes. While the improvements are modest, they suggest that the betting market does not fully integrate all available fighter information. Additionally, we explore the impact of a 2017 rule change in judging criteria on model accuracy, finding no statistically significant shift in performance differences. Overall, this study indicates that combining betting odds with nuanced fighting metrics can enhance predictive modeling in MMA.
+
+
+\newpage
+
+# Introduction
+
+The sport of Mixed Martial Arts (MMA) has evolved from its origins as a competition between various martial arts disciplines into a dynamic and complex sport, requiring a wide range of skills and strategies. MMA has continued to grow in popularity, especially in the realm of sports betting, the market has witnessed rapid expansion, particularly with platforms like DraftKings, the official sports betting platform of the UFC. Betting markets have long been regarded as generally being "efficient" (Winkelmann), which can be understood as the markets fully including and capturing all relevant information with regards to predicting said chance events. For the most part this is true, but betting on Mixed-Martial-Arts Fighting (MMA) presents an interesting case in which this efficiency assumption might be tested. The sport's complexity, with its wide array of fight styles and the unpredictability of each bout, offers an opportunity to explore potential inefficiencies in betting odds and predictions. It is well understood that all fighters competing in MMA , even those facing an opponent of greater skill, has a 'puncher’s chance,' or a chance to score a surprise knockout or submission victory. Specific abilities or actions can often make up for large gaps in skill. Much like in the Super Bowl, 'worse' MMA fighters regularly can win large upsets, sometimes dominantly. This paper seeks to investigate whether MMA fight outcomes can be better predicted by leveraging fighter statistics, advanced statistical techniques, and machine learning models. MMA, such as many other sports, has become increasingly data and metric based when discussing analysis, and hundred of statistics for each fighter can be easily attained before any given fight. Given that these data are public ally available, it stands to reason that new novel variables and techniques may be needed in order to achieve more accurate predictions. As such, there is great potential to improve in prediction accuracy over standard betting lines.
+
+The objective of this study is to analyze pre-fight fighter statistics across a wide range of MMA fights, construct innovative metrics such as activity scores and style clusters, and evaluate the predictive power of various models. Specifically, this research will attempt to better understand which fatures are most predictive of MMA fight outcomes, which models strike the best balance between accuracy and complexity, for predicting fight results, and how dynamic factors like age, fighting style, and rule changes impact the process of predicting fight outcomes. In doing so, this thesis will contribute to the growing field of sports analytics (Chugani) by integrating and cleaning a comprehensive data set, developing several novel features, and thoroughly evaluating statistical and machine learning models to provide deeper insights into the factors that drive fight outcomes in MMA. This paper has been made as QMD /Quarto document using R and R Studio, with all code being included in-document. A secondary document will be created, with code emitted but code output still included. The data set was gathered from Kaggle and can be found [**here**](https://www.kaggle.com/datasets/rajeevw/ufcdata)(Warrier)and [**here**](https://www.kaggle.com/datasets/mdabbert/ultimate-ufc-dataset)(mdabbert) as of 12/10/2024.
+
+MMA began as a competition aimed at determining the most effective martial art by bringing together practitioners from various disciplines under a common rule set. In MMA fighters combine techniques and skills from disciplines such as Brazilian Jiu-Jitsu, boxing, kickboxing, wrestling, and many others, often adapting to the unique challenges posed by their opponent's own style. As time has gone on, MMA fighters have needed to become increasingly well-rounded in all skills order to achieve success at the highest level. Fights are won either by finish or going to a judge's decision. Finishes can happen at any moment within a fight (typically 3 5-minute rounds), whereas winners are decided by the ringside judges if a fight does not reach a finish before time runs out. A finish could involve one fighter rending the other unconscious (Knockout, or KO), causing one fighter to no longer be able to intelligently defend themself (Technical Knockout), or "tapping out" are giving up to a submission, such as a choke hold or an arm lock (Submission, or SUB). The fact that fights can end at any moment, from the 5th second of the fight to the very last second (Record Book) makes the sport exhilerating and unpredictable. Additionally, since competition only occurs between two individuals rather than teams, and these competitions occur only a few times a year for each fighter (typically only three), this adds to the unpredictably of predicting fight outcomes. In *A Markov chain model for forecasting results of mixed martial arts contests* (2022), the authors note the impact the impact of infrequent fights and inconsistent times between fights as being a factor contributed to noise within the data(Holmes et al.). Finally, the sport is further complicated by the wide variety of martial arts being used as this makes judging rounds and deciding the winner of a fight more complicated than in a sport like boxing ,which has a smaller variety of actions occurring and a more consistent scoring pattern. The wide variety of styles also impacts how fighters with different styles match up, similarly to a game of rock-paper-scissors. By better understanding which pre-fight statistics contribute to understanding which fighter is going to win, this paper lays the groundwork to improve the quality/focus of preparing for fights, making more informed betting decisions, and gain insight into the nature of betting markets on outcomes with extreme variation and noise.
+
+
+\newpage
+
+# Literature Review
+
+Much has been written about sports betting and betting markets, but relatively little has been written about MMA sports betting, or predicting MMA fight outcomes in general. One major challenge to predicting MMA betting lies in the fact that many of the "variables" or factors that could influence an outcome of a fight are unknown to the broader public such as injuries occurring in the lead-up to a fight. An example of this occurring happened in 2022 in which the Fighter TJ Dillashaw repeatedly injured his shoulder in the lead up to a fight with divisional champion, who would win the fight in dominant fashion after Dillashaw would once again re-injure his shoulder at the beginning of the match. A lot of data is also simply unknowable, such as what specific choices a fighter will make during a fight. One high profile example of this is Chris Weidman choosing throw a spinning back kick in his match against Luke Rockhold. This technique was risky, and well out of the ordinary for Weidman, and would result in a change in a position and a dominant loss in a fight he was previously winning. Finally, many intangibles permeate the sport and cannot or have not been quantified in a technical manner. For example, as mentioned in the introduction, the "style" of fighters is not something which has not been objectively measured using pre-fight data. The goal of this literature review, and subsequent analysis, is to target this third factor by trying to make intangible qualities such as "style", more tangible.
+
+In one recent work, *A Markov chain model for forecasting results of mixed martial arts contests* (2022), the author s analyze MMA fights by simulating continuous markov chains rather than predicitng the binary outcome of the fight directly. The resulting model leads to an increase in accuracy over the traditional betting odds implied win-probabilities. The paper also makes note of some of the major paper's covering mma forecasting and the implementation of machine learning models saying, "There is very little literature on forecasting the results of MMA bouts. [Johnson (2009)](https://www.sciencedirect.com/science/article/pii/S0169207022000073#b19), [Ho (2013)](https://www.sciencedirect.com/science/article/pii/S0169207022000073#b17), [Hitkul et al. (2019)](https://www.sciencedirect.com/science/article/pii/S0169207022000073#b16), and [Robles and Wu (2019)](https://www.sciencedirect.com/science/article/pii/S0169207022000073#b28) used various [machine learning algorithms](https://www.sciencedirect.com/topics/engineering/machine-learning-algorithm "Learn more about machine learning algorithms from ScienceDirect's AI-generated Topic Pages") consisting of similar variables to predict the winner of a fight"(Holmes et al.)". These models ranged in effectiveness of predictions of 50-68%, but notably weren't compared to the betting market predictions. *Are Money Line Odds in UFC Matches Calibrated? Evidence From Events in 2019–2020* (2021) notably looks at recent UFC fight outcomes in order to determine if the odds placed on matches are calibrated. The paper concludes that money line wagers(betting on who will win) are indeed calibrated, but wagers focusing on winning methods or rounds were not (Stanhope), suggesting a layer of inefficiency. One possible explanation of this could be smaller betting volumes on those more specific bets. This paper will exploring the use of clustering (k-means and hierarchical) to categorize fighters into different 'styles' and assess how these styles match up in head-to-head matchups, a concept also examined by Robles and Wu (2019). Their work provides valuable insight into this approach, which will be further explored and expanded upon in the current analysis.
+
+Broadly, studies of betting market efficiency, such as 'Market Efficiency and the Favorite-Longshot Bias' (1994), explore biases that might affect MMA betting markets as well. For the paper in question, it analyzes the favorite-longshot bias long-observed in horse-racing, in which bettors over-bet/over-value the chances of extremely unlikely outcomes and finds this pattern to also exist in baseball*(Woodland and Woodland)*. *Determinants of betting market efficiency* (2006) meanwhile sought to better understand betting market efficiency with regards to horse-racing by incorporating regression analysis, ultimately finding that the favorite-longshot bias exists, but is diminished by larger pools of racers, lower quality fields, and races occurring on grass (Gramm \* and Owens). *Weak Form Efficiency in Sports Betting Markets* (2023) analyzes the efficiency of sports betting markets by looking at betting odds and outcomes across a wide array of sports over an extended period, finding that sports-betting markets are generally efficient outside of specific situation bets which remained net-positive over the analysis period (Robbins). Testing Market Efficiency: Evidence From The NFL Sports Betting Market (2012) similarly looks at NFL match outcomes using a probit model, finding that although some specific betting strategies were capably of generating statistically significant profits, any inefficiency tended to dispensary and weaken over time. This paper aims to build on existing literature by developing novel variables, testing both statistical and machine learning models, and exploring their effectiveness in predicting MMA fight outcomes. By explicitly comparing predictions from created models to the predictions implied by the betting odds, we will directly attempt to find market inefficiency and pinpoint exactly which existing or unaccoutnedfor / created variablels are responsible for driving the ineffiency.
+
+
+\newpage
+
+# Data Processing and Variable Development
+
+## i. Datasets
+
+The two key data sets were each gathered from Kaggle, and can be accessed. In both of the data sets, each row represents a unique fight. The former data set spans from 1993 (the year the UFC was founded) to 2021 and contains information on pre-fight statistics for each fighter, attributes of the fighters such as their height or wingspan (also known as reach), and winner and method of victory for the fight in question. The latter data set spans from 2010 to June 2024, and contains similar pre-fight statistic and winner information, but also includes the respective pre-fight betting odds. These odds were gathered from bestfightodds.com, which compiles odds from the largest online betting markets.. For this datasheet specifically, only the DraftKings odds are included and no averaging or other weighting occurs. Note that these data include information from only the fighter’s UFC fights in the period and is does heir fights in other organizations, or their amateur career.
+
+These data sets were merged horizontally by matching the respective fighters, as well as the date to ensure that pairs who fought multiple times are included. As a small note, it is important to note that for all UFC fights, one fighter is assigned as the "red fighter" (or they are in the "red corner"), and the other as the blue fighter. It is convention for the higher ranked fighter or the champion of a weight division to be the red-fighter. When there is not a clear distinction in ranking (i.e. neither fighter is ranked officially in the division), the fighter with more experience is typically red. Typically, red fighters tend to be the favorite in a given fight as a result. The main variables to consider for this data set are "winner", which is a binary variable that is made to be true for "Red" fighter wins, and false for "Blue" fighter wins, and "r_odds", which describes the implied probability of the "Red" fighter winning the fight. In this analysis, we standardize the r_odds so that r_odds and b_odds sum to 1.
+
+## ii. Data Cleaning
+
+Our analysis began by loading in the required libraries. Libraries such as caret and randomForest were selected to enable machine learning workflows, while MASS and psych support statistical modeling and factor analysis. Below is a section doing so, with comments indicating the general purpose of each library. It is important to install each package before running the analysis. As reproducibility is a cornerstone of good statistical practice, we also use the set.seed function in order to ensure tha random processes such as clustering or random forest algorithms produce consistent results, allowing others to replicate our findings exactly. Finally, several utility functions are included in order to simplify later code. The select_vars_with_substring function was designed in order to obtain a list of variables including the specified search term, as well as the "winner" variable. This allowed for easy subletting of data which was helpful for regressing specific groups of variables on the winner variable. The vegas_to_decimal_chance function provides a way of turning the Vegas style odds into decimal probability values. The get_top_variables function allows for easy access to the key variables impacting the factors in the factor analysis section of the paper. Next, the calc_vif function calculates the variance inflation factor for different variables, which was useful when wanting to build models with limited multicolliniearity. Finally, log_likelihood was used to compute log likelihoods from probabilities.
+
+```{r,include=FALSE}
+# This code section loads libraries and creates a select_vars_with_substring which can be used to quickly return a vector of variable names for running simple regressions on subsets of data. 
+# -----------------------------------------------------------------------------------
+
+# Hides Warnings
+options(warn = -1)
+
+# Load required libraries
+library(tidyverse) # Data wrangling, visualization
+library(janitor) # Data cleaning
+library(dplyr) # Data manipulation
+library(tidyr) # Data tidying
+library(MASS) # Statistical models
+library(mice) # Missing data imputation
+library(randomForest) # Random forest model
+library(xgboost) # Gradient boosting
+library(caret) # Machine learning framework
+library(glmnet) # Regularized GLMs
+library(ggplot2) # Data visualization
+library(stargazer) # Regression tables
+library(broom) # Tidy model output
+library(stats) # Basic statistics
+library(car) # Regression diagnostics
+library(psych) # Psychometrics, factor analysis
+
+
+# Ensure reproducibility
+set.seed(123)  
+
+# Function: Select columns containing a specific substring and ensure "winner" is included
+select_vars_with_substring <- function(df, substring) {
+  selected_columns <- grep(substring, names(df), value = TRUE)  # Get column names containing substring
+  selected_columns <- unique(c("winner", selected_columns))  # Ensure "winner" is included
+  return(selected_columns)  # Return selected column names
+}
+
+# Convert betting odds to standardized probabilities
+vegas_to_decimal_chance <- function(odds) {
+  ifelse(odds > 0, 100 / (odds + 100), -odds / (-odds + 100))
+}
+
+# Define a function to extract the top variables for each factor
+get_top_variables <- function(loadings_matrix, num_top = 5) {
+  top_variables <- apply(loadings_matrix, 2, function(column) {
+    sorted_indices <- order(abs(column), decreasing = TRUE)
+    names(column)[sorted_indices[1:num_top]]
+  })
+  return(top_variables)
+}
+
+# Function to calculate Variance Inflation Factor (VIF)
+calc_vif <- function(data) {
+  vif_values <- sapply(names(data), function(var) {
+    model <- lm(as.formula(paste(var, "~ .")), data = data)
+    1 / (1 - summary(model)$r.squared)
+  })
+  return(vif_values)
+}
+
+# Define a function to calculate log-likelihood
+log_likelihood <- function(y, p) {
+  return(sum(y * log(p) + (1 - y) * log(1 - p), na.rm = TRUE))
+}
+
+```
+
+The next step of analysis involved loading the data into R, standardizing ID variables between the two data sets, and merging the data sets horizontally. From then, the resulting date frame was cleaned and standardized. Column names were standardized using patterns like replacing 'Red' with 'R\_' and 'Blue' with 'B\_' to ensure consistency and clarity. Draws, although not nonexistent, are relatively rare in MMA. As MMA fights occur with an odd-number of rounds, special circumstances must occur for a draw to occur (either a very dominant round from one fighter, or a point deduction from commuting a foul or several fouls). As they make up a small proportion of fights outcomes(approximately 5%), and complicate what would otherwise be a simple binary winner variable, they have been removed for the purposes of this specific analysis. This decision simplifies the predictive modeling process as binary variables are much easier to work with, but presents opportunity for future research to include draws as a possible outcome. Columns that were deemed redundant, error-prone, or irrelevant for the analysis were removed to streamline the data set.
+
+Odds for the probability of red and blue victories are also converted from "Vegas odds" to decimal values of the implied probability from said odds. From then, the data set is then filtered to ensure completeness for variables which will later be used to classify fighters into groups based on their styles. Weight classes were reordered to be sorted by Gender and then Weightclass in ascending order of weight. More information on weight classes in MMA is availible [here](https://www.mmahive.com/ufc-weight-classes/) (Bloom). Variables other than winner which describe the row's fights outcomes specifically, rather than pre-fight statistics, are removed as these are not useful for for prediction. Winning methods (how a given fight was won e.g., KO or submission) were also removed to prevent circular reasoning in the predictive models, as they directly relate to fight outcomes. With all of these done, we have concluded the data cleaning process. This data cleaning and pre-processing process ensures that the resulting dataset is both high-quality and contributes to the specific objectives of this study.
+
+```{r, include=FALSE}
+# This code section loads the original data from each source, standardizes them, merges them, and then cleans the data. 
+# -----------------------------------------------------------------------------------
+
+# Load and preprocess data
+processed_data <- read.csv("C:/Users/kylou/Downloads/archive (2)/data.csv")
+master_data <- read.csv("C:/Users/kylou/Downloads/UFCDATA/ufc-master.csv")
+
+# Standardize column names for consistency
+colnames(master_data) <- colnames(master_data) %>%
+  gsub("Red", "R_", .) %>%
+  gsub("Blue", "B_", .) %>%
+  gsub("Fighter", "fighter", .) %>%
+  gsub("Date", "date", .)
+
+# Filter out draws and merge datasets by common keys
+processed_data <- processed_data[processed_data$Winner != "Draw", ]
+merged_data <- merge(master_data, processed_data, by = c("R_fighter", "B_fighter", "date"))
+
+# Clean merged dataset
+merged_data <- merged_data %>%
+  mutate(winner = (Winner.x == "Red"))  # Create binary "winner" column (1 = Red win)
+
+# Remove specific columns
+merged_data <- merged_data %>%
+  dplyr::select(
+    -R_DecOdds, -B_DecOdds, -RSubOdds, -BSubOdds, -RKOOdds, -BKOOdds, 
+    -R_Weight_lbs, -B_Weight_lbs, -R_ExpectedValue, -B_ExpectedValue
+  )
+
+# Clean column names
+cleaned_data <- merged_data %>%
+  clean_names() %>%  # Ensure all column names are consistent
+  dplyr::select(-contains("_2"), -contains("_x"), -contains("_y"))  # Remove unwanted columns
+
+# Convert betting odds to standardized probabilities
+
+cleaned_data <- cleaned_data %>%
+  mutate(
+    r_odds = vegas_to_decimal_chance(r_odds),
+    b_odds = vegas_to_decimal_chance(b_odds),
+    total_chance = r_odds + b_odds,
+    r_odds = r_odds / total_chance,
+    b_odds = b_odds / total_chance
+  )
+
+# Removal total chance variable 
+cleaned_data <- cleaned_data %>%
+   dplyr::select(-total_chance)
+
+
+
+# Filter for complete cases on key variables
+key_vars <- c(
+  "b_avg_sig_str_att", "b_avg_sig_str_landed", "b_avg_td_att", "b_avg_td_landed", 
+  "b_avg_sub_att", "b_avg_ctrl_time_seconds", "b_wins_by_ko", "b_wins_by_submission",
+  "r_avg_sig_str_att", "r_avg_sig_str_landed", "r_avg_td_att", "r_avg_td_landed", 
+  "r_avg_sub_att", "r_avg_ctrl_time_seconds", "r_wins_by_ko", "r_wins_by_submission"
+)
+
+cleaned_data <- cleaned_data %>% filter(complete.cases(dplyr::select(., all_of(key_vars))))
+
+# Reorder levels of the 'weight_class' factor
+cleaned_data$weight_class <- factor(
+  cleaned_data$weight_class,
+  levels = c(
+    "Women's Strawweight", "Women's Flyweight", "Women's Bantamweight", "Women's Featherweight",
+    "Flyweight", "Bantamweight", "Featherweight", "Lightweight", "Welterweight", 
+    "Middleweight", "Light Heavyweight", "Heavyweight"
+  )
+)
+
+# Ensure 'date' is in Date format
+cleaned_data <- cleaned_data %>%
+  mutate(date = as.Date(date))
+
+
+# Define the variables describing the current fight
+potential_current_fight_vars <- c(
+  "finish", "finish_details", "finish_round", "finish_round_time", 
+  "total_fight_time_secs", "referee"
+)
+
+# Remove these variables from the cleaned_data dataset
+cleaned_data <- cleaned_data %>%
+  dplyr::select(-all_of(potential_current_fight_vars))
+
+
+# Identify variables describing the current fight
+vars_to_remove <- grep("^b_win_by_|^r_win_by_", names(cleaned_data), value = TRUE)
+
+# Subset the data, excluding the identified variables
+cleaned_data <- cleaned_data %>%
+  dplyr::select(-all_of(vars_to_remove))
+
+
+
+```
+
+In the following section, new simple variables are added onto the data frame. First, the code adds on a binary variable indicating whether or not each fighter is 35 years old or older. In "MMA", there is a known phenomenon of fighters turnings 35 and then rapidly dropping in success. In weight classes below the 170lb division (Welterweight), fighters are 2-32 in title fights when they are 35 or older and their opponent is not (Barrasso). The inclusion of a binary age serves to extend the literature on age-related performance declines in MMA (Kirk), providing a simple yet effective feature for understanding its impact on fight outcomes which can be included in addition to pure age. The code also creates a subset where both fighters have had at least two prior fights. As contracts in the UFC are not fully guaranteed, often time fighters sign with the ufc, lose one or two fights, and are cut from the organisation. It is possible that these particularly weak fighters could distort models, so this subset that excludes them was developed to test that. While excluding fighters with fewer than two fights could potentially reduce noise, it may also introduce bias by omitting potentially skilled newcomers who succeed in their first UFC fights, and lower the power by excluding the first two fights of all fighters that remain in the post two fight subset. Although the remainder of the analysis will continue with the full dataset, the subset can potentially a valuable robustness check to ensure that models are not disproportionately influenced by inexperienced fighters. While not included in this report, it was generally observed that this had little or negative impact on predicting power, aside from one exception which will be noted in the finishing score section.
+
+```{r, include=FALSE}
+# This code section creates a new subset filters for fights where both fighters have had at least 2 prior fights.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Add age dummy variables
+cleaned_data <- cleaned_data %>%
+  mutate(
+    r_age_over_34 = ifelse(r_age >= 35, 1, 0),
+    b_age_over_34 = ifelse(b_age >= 35, 1, 0)
+  )
+
+
+# Step 2: Filter fights where both Red and Blue fighters have had at least 2 previous fights
+high_fight_subset <- cleaned_data %>%
+  filter(
+    # Apply a condition row-wise to calculate the number of prior fights for each fighter
+    sapply(1:nrow(cleaned_data), function(i) {
+      # Count prior fights for Red fighter
+      r_fighter_count <- sum(
+        (cleaned_data$r_fighter == cleaned_data$r_fighter[i] | cleaned_data$r_fighter == cleaned_data$b_fighter[i]) & 
+        cleaned_data$date < cleaned_data$date[i]
+      )
+      # Count prior fights for Blue fighter
+      b_fighter_count <- sum(
+        (cleaned_data$b_fighter == cleaned_data$r_fighter[i] | cleaned_data$b_fighter == cleaned_data$b_fighter[i]) & 
+        cleaned_data$date < cleaned_data$date[i]
+      )
+      # Ensure both fighters have at least 2 prior fights
+      return(r_fighter_count >= 2 & b_fighter_count >= 2)
+    })
+  )
+
+```
+
+Next, it is important to note issues with the weights_lbs variables, which describe the respective fighters weights at the official pre-fight weigh in the day before the fight. Somehow, the authors of the original data set did not scrape the data correctly, as each individual fighter's most recent weight in the data overwrites all previous weights (ie, there is no individual variation in weight across different fights). This results in a lack of individual variation in weight across fights, rendering these variables unreliable. For this analysis we will simply disregard this, but future work could involve rescraping the data correctly.
+
+```{r, include=FALSE}
+# This code section examines inconsistencies in the r_weight_lbs and b_weight_lbs variables. 
+# It creates tables to show the number of unique weight values per fight and demonstrates that these variables 
+# are unreliable. 
+# This code section also removes the unreliable r_weight_lbs and b_weight_lbs variables from cleaned_data.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Check the number of unique weights assigned to each fighter per fight
+weight_issues <- cleaned_data %>%
+  group_by(r_fighter, b_fighter, date) %>%
+  summarize(
+    unique_r_weights = n_distinct(r_weight_lbs),  # Unique weights for Red fighter
+    unique_b_weights = n_distinct(b_weight_lbs),  # Unique weights for Blue fighter
+    .groups = "drop"
+  )
+
+# Step 2: Create tables showing the frequency of unique weights per fight
+red_weight_table <- table(weight_issues$unique_r_weights)
+blue_weight_table <- table(weight_issues$unique_b_weights)
+
+# Step 3: Display the tables for review
+print("Frequency of Unique Weights for Red Fighters:")
+print(red_weight_table)
+
+print("Frequency of Unique Weights for Blue Fighters:")
+print(blue_weight_table)
+
+# Step 4: Note that inconsistencies in weights suggest these variables should be removed
+print("The above tables demonstrate that r_weight_lbs and b_weight_lbs have zero varation in individual fighters. This is factually untrue and can be verified using fight data from the UFC website. As such, the variables ought to be removed. ")
+
+
+# Step 5: Remove the problematic weight variables
+cleaned_data <- cleaned_data %>%
+  dplyr::select(-r_weight_lbs, -b_weight_lbs)
+```
+
+## iii. Feature Engineering and Variable Development
+
+As we have cleaned and standardized the data set, this paper will now attempt to design several new variables, to be used in the prediction models, in order to try to examine possible gaps of information that are not being considered in the official betting odds. By creating new variable, this enables us to potentially determine more information about fighter performance that aren't directly related to the pre-fight statistics or included in the official odds. We would generally not expect models built off of public ally available variables alone to produce gains in accuracy over the odds, as if this information is available, it should lead to arbitrage, with the thus market shifting to the true expected win-probability. These novel variables allow of the potential to reveal new patterns or trends within the existing data.
+
+### a. Style Clustering
+
+The first feature we will attempt to create and describe are "style" groupings for each fighter. It is often said that in MMA "styles make fights". Often times, rock-paper-scissors type outcomes occur in MMA where one fighter has advantages over one fighter based on their style but disadvantages on others, making transitive property type "A beat B and B beat C, therefore A should beat C" predictions potentially troublesome. There is no objective indicator of a fighters style that currently exists, so one goal of this analysis was to group fighters into styles based on how their fight statistics indicate how they fight. Examples of such variables include how many strikes a given fighter attempts or lands per fight, how many take downs they attempt and land, or how many wins a fighter has via knockout or submission. These variables provide insight into fighters' offensive and defensive abilities and tendancies, which help to distinguish overall patterns of how they fight. In addition to this, as these variables are calculated for each fight, this allows for the styles of fighters to evolve and change over the course of their career.
+
+We first proceed with k-means clustering, which assumes that the data can be partitioned into distinct, non-overlapping clusters based on the similarity of the observations, with each observation being assigned to the nearest cluster centroid. Variables that seemed indicative of fighting style were manually chosen. From here, red and blue fighter data was merged into a unified set in order to ensure groupings for both groups were assigned in the exact same way. This is done to ensure the clustering is based on a complete view of fighters independent of their specific position in any bout. One area this then leaves unaddressed is the potential for fighters to fight differently when being in the red corner vs. the blue corner. The variables were then standardized before clustering to ensure that variables measured on different scales (e.g., strikes vs. control time) contribute equally to the clustering process. Upon testing many different k-values, a value of 6 was deemed best. Values lower than 6 lead to the grouping of unsimilar fighters, which had the effect of reducing the differences between the clusters. All of the groups were all average in all of the metrics of analysis. Meanwhile, values higher than six complicated the number of possible style matchups, while not meaningfully adding to the models accuracy or interpretability. Using a k-value of 6, the means of key variables were interpreted, and a manual title and description of each fighter group was assigned. For example, cluster 6 was distinguished by it's high values for strikes attempted and landed, which is typical of a "Volume Striker", or a fighter who attempts a high output of punches and kicks in order to control the pace of the fight, win on the judge's scorecards, and give themselves more chances to throw a fight-ending blow.
+
+As we can see from "lm_style_match up_test" and "lm_style_test" logistic regression models, both models include all of the style_matchup combinations and styles respectively, alongside the odds of the fight. While style matchups and individual styles may contribute to predicting fight outcomes, the signifcance of their coefficents are somewhat limited by controlling for betting odds. This implies that betting odds already incorporate at least some of the information of fighting styles, though some nuanced effects may still be present. As a small note, is important to recognize that mirror matchups such as "Balanced vs BalancedWrestler" and "BalancedWrestler vs Balanced" remain in the stylematchup variable, in order to test for the possibility that a red fighter having a certain matchup is different than a blue fighter. 
+
+```{r, echo=FALSE}
+# This code section performs k-means clustering to classify fighter styles and analyzes their impact.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Select only style-related variables for clustering
+combined_data <- cleaned_data %>%
+  dplyr::select(
+    b_avg_sig_str_att, b_avg_sig_str_landed, b_avg_td_att, b_avg_td_landed, 
+    b_avg_sub_att, b_avg_ctrl_time_seconds, b_wins_by_ko, b_wins_by_submission,
+    r_avg_sig_str_att, r_avg_sig_str_landed, r_avg_td_att, r_avg_td_landed, 
+    r_avg_sub_att, r_avg_ctrl_time_seconds, r_wins_by_ko, r_wins_by_submission
+  ) %>%
+  filter(complete.cases(.))  # Keep rows with complete data
+
+# Step 2: Combine data for red and blue fighters into a unified dataset for clustering
+unified_data <- cleaned_data %>%
+  dplyr::select(
+    b_avg_sig_str_att, b_avg_sig_str_landed, b_avg_td_att, b_avg_td_landed, 
+    b_avg_sub_att, b_avg_ctrl_time_seconds, b_wins_by_ko, b_wins_by_submission
+  ) %>%
+  rename_with(~ gsub("^b_", "", .)) %>%  # Standardize column names for blue fighters
+  bind_rows(
+    cleaned_data %>%
+      dplyr::select(
+        r_avg_sig_str_att, r_avg_sig_str_landed, r_avg_td_att, r_avg_td_landed, 
+        r_avg_sub_att, r_avg_ctrl_time_seconds, r_wins_by_ko, r_wins_by_submission
+      ) %>%
+      rename_with(~ gsub("^r_", "", .))  # Standardize column names for red fighters
+  ) %>%
+  filter(complete.cases(.))  # Keep rows with complete data
+
+# Step 3: Standardize the data for clustering
+unified_data_scaled <- scale(unified_data)
+
+# Step 4: Perform K-means clustering to classify fighter styles
+set.seed(123)  # Ensure reproducibility
+kmeans_clusters <- kmeans(unified_data_scaled, centers = 6)  # Using 6 clusters
+
+# Step 5: Assign cluster labels back to red and blue fighters
+unified_data$style_cluster <- kmeans_clusters$cluster
+cleaned_data$b_style_cluster <- unified_data$style_cluster[1:nrow(cleaned_data)]
+cleaned_data$r_style_cluster <- unified_data$style_cluster[(nrow(cleaned_data) + 1):(2 * nrow(cleaned_data))]
+
+# Step 6: Calculate cluster means to analyze style characteristics
+cluster_means <- unified_data %>%
+  group_by(style_cluster) %>%
+  summarise(across(everything(), mean, na.rm = TRUE))
+print(round(cluster_means, 2))  # View cluster means for understanding
+
+# Step 7: Convert clusters into descriptive categories for red and blue fighters
+cleaned_data$b_style_cluster <- recode_factor(as.factor(cleaned_data$b_style_cluster),
+                                              `1` = "BalancedWrestler", 
+                                              `2` = "PowerStriker", 
+                                              `3` = "Grappler", 
+                                              `4` = "VolumeWrestler",
+                                              `5` = "Balanced", 
+                                              `6` = "VolumeStriker")
+
+cleaned_data$r_style_cluster <- recode_factor(as.factor(cleaned_data$r_style_cluster),
+                                              `1` = "BalancedWrestler", 
+                                              `2` = "PowerStriker", 
+                                              `3` = "Grappler", 
+                                              `4` = "VolumeWrestler",
+                                              `5` = "Balanced", 
+                                              `6` = "VolumeStriker")
+
+# Step 8: Create a style matchup variable for regression analysis
+cleaned_data$style_matchup <- paste0(cleaned_data$r_style_cluster, "_vs_", cleaned_data$b_style_cluster)
+
+# Verify the distribution of style clusters for red fighters
+table(cleaned_data$r_style_cluster, useNA = "always")
+
+# Step 9: Perform logistic regression to analyze the effect of style matchups
+lm_style_matchup_test <- glm(winner ~ r_odds + style_matchup, data = cleaned_data, family = "binomial")
+summary(lm_style_matchup_test)
+
+# Perform logistic regression to analyze the effect of individual styles
+lm_style_test <- glm(winner ~ r_odds + r_style_cluster + b_style_cluster, data = cleaned_data, family = "binomial")
+summary(lm_style_test)
+
+```
+
+Descriptions of each of these fight styles have been included in the table below.
+
+
+$$
+\begin{array}{|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{10cm}|}
+\hline
+\textbf{Style Cluster} & \textbf{Description} \\ \hline
+Balanced Wrestler & Combines striking with wrestling, aiming to control opponents on the ground. Often wins by keeping the opponent down and landing strikes from above. \\ \hline
+Power Striker & Focuses on powerful punches and kicks to get a knockout. Strong at striking from a distance but may struggle if taken to the ground. \\ \hline
+Grappler & Aims to bring the opponent to the ground for submissions like chokeholds. Skilled in controlling opponents and winning by forcing them to "tap out." \\ \hline
+Volume Wrestler & Keeps a high pace with frequent takedowns and ground control. Wears opponents down with repeated attacks, often winning by decision. \\ \hline
+Balanced & A well-rounded fighter with solid skills in both striking and grappling. Adapts to different opponents and can win by either strikes or grappling. \\ \hline
+Volume Striker & Overwhelms opponents with lots of punches and kicks, aiming to outscore them rather than knock them out. Often wins by decision. \\ \hline
+\end{array}
+$$
+
+
+
+The next section of code also attempts to perform clustering in order to classify fighters according to their fight style, but does so using hierarchical clustering rather than k-means clustering. Hierarchical clustering works by forming a tree-like structure of nested clusters based on a distance metric, without assuming a predefined number of clusters. This is potentially useful as Hierarchical clustering can produce clusters with vastly different shapes and sizes based on the similarity of the data points, whereas k-means clustering tends to create clusters that are more compact and of similar size and shape. This can be seen in the counts of each fight cluster in the final results for each clustering model, with the counts of each style being much more uniform in the k-means model as compared to the hierarchical model. Euclidean distance was used as the metric for measuring similarity between fighters, as it captures straight-line differences across the scaled variables. Additionally, the use of Ward’s method minimizes the total in-cluster variance, helping clusters to be more cohesive and similar. In order to align the results of this clustering with the previous section, a classification rule was drawn to lead to six different groups. Although differing in the specific values and means of fighters in each cluster, the same six labels from k-means clustering appear to be a reasonable fit, which allows for better comparison between the two models. Similar to before, logistic models are are fit with the hierarchal clustering's style and style matchups variables. The results appear to be mostly similar.
+
+```{r, include=FALSE}
+# This code section performs hierarchical clustering to classify fighter styles and analyzes their impact.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Select only style-related variables for clustering
+combined_data_hier_clust <- cleaned_data %>%
+  dplyr::select(
+    b_avg_sig_str_att, b_avg_sig_str_landed, b_avg_td_att, b_avg_td_landed, 
+    b_avg_sub_att, b_avg_ctrl_time_seconds, b_wins_by_ko, b_wins_by_submission,
+    r_avg_sig_str_att, r_avg_sig_str_landed, r_avg_td_att, r_avg_td_landed, 
+    r_avg_sub_att, r_avg_ctrl_time_seconds, r_wins_by_ko, r_wins_by_submission
+  ) %>%
+  filter(complete.cases(.))  # Retain only rows with complete data
+
+# Step 2: Combine data for red and blue fighters into a unified dataset for clustering
+unified_data_hier_clust <- cleaned_data %>%
+  dplyr::select(
+    b_avg_sig_str_att, b_avg_sig_str_landed, b_avg_td_att, b_avg_td_landed, 
+    b_avg_sub_att, b_avg_ctrl_time_seconds, b_wins_by_ko, b_wins_by_submission
+  ) %>%
+  rename_with(~ gsub("^b_", "", .)) %>%  # Standardize column names for blue fighters
+  bind_rows(
+    cleaned_data %>%
+      dplyr::select(
+        r_avg_sig_str_att, r_avg_sig_str_landed, r_avg_td_att, r_avg_td_landed, 
+        r_avg_sub_att, r_avg_ctrl_time_seconds, r_wins_by_ko, r_wins_by_submission
+      ) %>%
+      rename_with(~ gsub("^r_", "", .))  # Standardize column names for red fighters
+  ) %>%
+  filter(complete.cases(.))  # Retain only rows with complete data
+
+# Step 3: Standardize the data for clustering
+unified_data_scaled_hier_clust <- scale(unified_data_hier_clust)
+
+# Step 4: Perform hierarchical clustering using Euclidean distance and Ward's method
+dist_matrix_hier_clust <- dist(unified_data_scaled_hier_clust, method = "euclidean")
+hclust_result_hier_clust <- hclust(dist_matrix_hier_clust, method = "ward.D2")
+
+# Step 5: Cut the dendrogram into 6 clusters
+num_clusters_hier_clust <- 6
+hclust_clusters_hier_clust <- cutree(hclust_result_hier_clust, k = num_clusters_hier_clust)
+
+# Step 6: Assign cluster labels back to red and blue fighters
+unified_data_hier_clust$style_cluster_hier_clust <- hclust_clusters_hier_clust
+cleaned_data$b_style_cluster_hier_clust <- unified_data_hier_clust$style_cluster_hier_clust[1:nrow(cleaned_data)]
+cleaned_data$r_style_cluster_hier_clust <- unified_data_hier_clust$style_cluster_hier_clust[(nrow(cleaned_data) + 1):(2 * nrow(cleaned_data))]
+
+# Step 7: Calculate means for each cluster to understand style characteristics
+cluster_means_hier_clust <- unified_data_hier_clust %>%
+  group_by(style_cluster_hier_clust) %>%
+  summarise(across(everything(), mean, na.rm = TRUE))
+
+# View cluster means for better understanding of style differences
+print(round(cluster_means_hier_clust, 2))
+
+# Step 8: Recode clusters into descriptive categories for interpretability
+cleaned_data$b_style_cluster_hier_clust <- recode_factor(as.factor(cleaned_data$b_style_cluster_hier_clust), 
+                                                         `1` = "Balanced", 
+                                                         `2` = "VolumeWrestler", 
+                                                         `3` = "PowerStriker", 
+                                                         `4` = "BalancedWrestler",
+                                                         `5` = "VolumeStriker", 
+                                                         `6` = "Grappler")
+
+cleaned_data$r_style_cluster_hier_clust <- recode_factor(as.factor(cleaned_data$r_style_cluster_hier_clust), 
+                                                         `1` = "Balanced", 
+                                                         `2` = "VolumeWrestler", 
+                                                         `3` = "PowerStriker", 
+                                                         `4` = "BalancedWrestler",
+                                                         `5` = "VolumeStriker", 
+                                                         `6` = "Grappler")
+
+# Step 9: Create a style matchup column
+cleaned_data$style_matchup_hier_clust <- paste0(cleaned_data$r_style_cluster_hier_clust, "_vs_", cleaned_data$b_style_cluster_hier_clust)
+
+# Step 10: View the distribution of red fighter styles
+table(cleaned_data$r_style_cluster_hier_clust, useNA = "always")
+
+# Step 11: Perform logistic regression for style matchups
+lm_style_matchup_hier_clust_test <- glm(winner ~ r_odds + style_matchup_hier_clust , 
+                                   data = cleaned_data, family = "binomial")
+summary(lm_style_matchup_hier_clust_test)
+
+# Step 12: Perform logistic regression for style-based clusters
+lm_style_hier_clust_test <- glm(winner ~ r_odds + r_style_cluster_hier_clust + b_style_cluster_hier_clust, 
+                           data = cleaned_data, family = "binomial")
+summary(lm_style_hier_clust_test)
+
+```
+
+In order to simplify our analysis and make it less redundant going forward, we will now compare the k-means and hierarchical clustering models in order to determine which is more effective as a clustering method. First, note the cross-tabulated assignment tables. As we can see, there is interesting an agreement of 59% for red fighters and 61% when clustering blue fighters. The agreement rates between k-means indicate a moderate amount of alignment bewteen the two, suggesting that while both methods capture similar trends in fighter styles while differing for a large portion of the data. As evident from the bar-plot, it is clear that the k-means model is assigning signifcantly more fighters to the BalancedWrestler group, and way less to the VolumeWrestler group, relative to the hierarchical model. Finally, AIC scores are computed for each model. The k-means model is determined to have a lower AIC value relative to the hierarchical model, indicating that it has a better balance between fit and complexity. While k-means clustering offers simplicity and a lower AIC score, its assumption of compact elliptical clusters may fail to determine the true relatinship and shape of groupings. Nonetheless, the k-means model's style and style_matchup variables are what is used going forward for the rest of the paper.
+
+```{r, echo=FALSE}
+# This code section compares the k-means and hierarchical clustering models by evaluating their ability to classify fighter styles and their predictive power in logistic regression models. Ultimately, the k-means model is chosen to continue with. 
+# -----------------------------------------------------------------------------------
+
+# Step 1: Evaluate the cluster assignments
+# Cross-tabulate k-means and hierarchical cluster assignments for both red and blue fighters
+kmeans_vs_hier_red <- table(cleaned_data$r_style_cluster, cleaned_data$r_style_cluster_hier_clust)
+kmeans_vs_hier_blue <- table(cleaned_data$b_style_cluster, cleaned_data$b_style_cluster_hier_clust)
+
+# Step 1.5: Subset both matrices to include only the common columns
+common_columns <- intersect(rownames(kmeans_vs_hier_red), colnames(kmeans_vs_hier_blue))
+kmeans_vs_hier_red <- kmeans_vs_hier_red[common_columns, common_columns, drop = FALSE]
+kmeans_vs_hier_blue <- kmeans_vs_hier_blue[common_columns, common_columns, drop = FALSE]
+
+
+# View the cross-tabulations
+print("Red Fighter: K-Means vs Hierarchical Clusters")
+# print(kmeans_vs_hier_red)
+
+print("Blue Fighter: K-Means vs Hierarchical Clusters")
+# print(kmeans_vs_hier_blue)
+
+# Step 2: Calculate the agreement rate between clustering methods
+agreement_rate_red <- sum(diag(kmeans_vs_hier_red)) / sum(kmeans_vs_hier_red)
+agreement_rate_blue <- sum(diag(kmeans_vs_hier_blue)) / sum(kmeans_vs_hier_blue)
+
+print(paste("Agreement Rate for Red Fighters:", round(agreement_rate_red, 2)))
+print(paste("Agreement Rate for Blue Fighters:", round(agreement_rate_blue, 2)))
+
+# Step 3: Compare regression models using AIC
+# Extract AIC values from the logistic regression models
+aic_kmeans_style_matchup <- AIC(lm_style_matchup_test)
+aic_hier_style_matchup <- AIC(lm_style_matchup_hier_clust_test)
+
+aic_kmeans_styles <- AIC(lm_style_test)
+aic_hier_styles <- AIC(lm_style_hier_clust_test)
+
+# Create a comparison table for AIC values
+aic_comparison <- data.frame(
+  Model = c("K-Means Style Matchup", "Hierarchical Style Matchup", "K-Means Styles", "Hierarchical Styles"),
+  AIC = c(aic_kmeans_style_matchup, aic_hier_style_matchup, aic_kmeans_styles, aic_hier_styles)
+)
+
+print("AIC Comparison Between Models:")
+print(aic_comparison)
+
+# Step 4: Interpret the results
+if (aic_kmeans_style_matchup < aic_hier_style_matchup) {
+  print("The K-Means Style Matchup model performs better (lower AIC) than the Hierarchical Style Matchup model.")
+} else {
+  print("The Hierarchical Style Matchup model performs better (lower AIC) than the K-Means Style Matchup model.")
+}
+
+if (aic_kmeans_styles < aic_hier_styles) {
+  print("The K-Means Styles model performs better (lower AIC) than the Hierarchical Styles model.")
+} else {
+  print("The Hierarchical Styles model performs better (lower AIC) than the K-Means Styles model.")
+}
+
+# Step 5: Visualize cluster comparisons
+# Bar plots to compare the frequency of cluster assignments in both models
+
+
+# Ensure the x-axis groups are alphabetically ordered
+kmeans_cluster_table <- table(cleaned_data$r_style_cluster)
+kmeans_cluster_table <- kmeans_cluster_table[order(names(kmeans_cluster_table))]
+
+hier_cluster_table <- table(cleaned_data$r_style_cluster_hier_clust)
+hier_cluster_table <- hier_cluster_table[order(names(hier_cluster_table))]
+
+# Combine the tables into a matrix for grouped bar plot
+combined_clusters <- rbind(kmeans_cluster_table, hier_cluster_table)
+
+# Adjust row names for clarity in the legend
+rownames(combined_clusters) <- c("K-Means", "Hierarchical")
+
+# Plot the grouped bar plot
+bar_positions <- barplot(
+  combined_clusters,
+  beside = TRUE,  # Group bars by x-groups
+  col = c("blue", "red"),  # Colors for the methods
+  ylim = c(0, max(combined_clusters) * 1.2),  # Add some space above bars
+  main = "Red Fighter Clusters Comparison",
+  ylab = "Frequency",
+  xlab = "Cluster",
+  names.arg = colnames(combined_clusters),  # Use x-group names
+  cex.names = 0.6  # Smaller font size for labels
+)
+
+
+
+# Add a legend
+legend(
+  "topright",
+  legend = rownames(combined_clusters),
+  fill = c("blue", "red"),
+  title = "Clustering Method",
+  cex = 0.8
+)
+
+```
+
+### b. Activity/Finishing Scores
+
+The next section of this paper will involve the creation of two scores. The first score we will construct is an "activity score", which is attempting to measure how "active" a fighter is, or how many offensive actions that they attempt to do per fight. All of the "attempt" variables are standardized, and then the sum is taken. This results in a score that measures overall activness that a fighter has had in their fights up to that point in their career. As we can see, there is a large amount of variation in these scores based on the below plots. From lm_activity_test, it is clear that, even when taking into account the betting odds, high values of r_activity_score and low b_activity_score values both significantly and positively contribute to the chance of a red victory. This suggests that the betting markets aren't fully taking the activity of fighters into account when making odds for a fight. One potential area of concern is the possibility that fighter's activity linearly decreases with age. As the activity score functions as a rolling average of all of their fights, this may bias the true value if fighters are no longer as active as they were when begging their ufc career. The plot suggests a negative correlation for both red and blue fighters, but there is a significant amount of variation and noise where most of the data is clustered. As such, we will move forward with using these variables as initially planned.
+
+```{r, echo=FALSE}
+# This code section calculates an activity metric for fighters based on volume/activity-related variables. 
+# It standardizes the data, computes a composite score, and evaluates its predictive power for fight outcomes.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Select volume/activity-related variables for both Blue and Red fighters
+activity_data <- cleaned_data %>%
+  dplyr::select(
+    b_avg_sig_str_att, b_avg_td_att, b_avg_sub_att,
+    r_avg_sig_str_att, r_avg_td_att, r_avg_sub_att
+  )
+
+# Step 2: Combine data for both Blue and Red fighters into a unified dataset for activity metric calculation
+unified_activity_data <- cleaned_data %>%
+  dplyr::select(
+    b_avg_sig_str_att, b_avg_td_att, b_avg_sub_att, b_avg_ctrl_time_seconds
+  ) %>%
+  rename_with(~ gsub("^b_", "", .), everything()) %>%
+  bind_rows(
+    cleaned_data %>%
+      dplyr::select(
+        r_avg_sig_str_att, r_avg_td_att, r_avg_sub_att, r_avg_ctrl_time_seconds
+      ) %>%
+      rename_with(~ gsub("^r_", "", .), everything())
+  )
+
+# Step 3: Standardize the unified dataset
+unified_activity_scaled <- scale(unified_activity_data)
+
+# Step 4: Calculate a composite activity score by summing the standardized values
+unified_activity_data$activity_score <- rowSums(unified_activity_scaled)
+
+# Step 5: Assign the calculated activity score back to both Blue and Red fighters in the original dataset
+cleaned_data$b_activity_score <- unified_activity_data$activity_score[1:nrow(cleaned_data)]
+cleaned_data$r_activity_score <- unified_activity_data$activity_score[(nrow(cleaned_data) + 1):(2 * nrow(cleaned_data))]
+
+# Step 6: Verify the new activity score columns for Blue and Red fighters
+print("Summary of Blue Fighters' Activity Scores:")
+print(summary(cleaned_data$b_activity_score))
+
+print("Summary of Red Fighters' Activity Scores:")
+print(summary(cleaned_data$r_activity_score))
+
+# Step 7: Perform logistic regression to evaluate the impact of activity scores on fight outcomes
+lm_activity_test <- glm(winner ~ r_odds + b_activity_score + r_activity_score, data = cleaned_data, family = "binomial")
+summary(lm_activity_test)
+
+
+# Step 8:  Look at age's relationship with activity score 
+
+# Filter data to include only rows with fighters' ages between 21 and 40
+filtered_data <- cleaned_data %>%
+  filter(r_age >= 21 & r_age <= 40 & b_age >= 21 & b_age <= 40)
+
+# Compute average activity scores by age for both red and blue fighters
+activity_by_age <- filtered_data %>%
+  group_by(r_age) %>%
+  summarise(
+    avg_activity_score_r = mean(r_activity_score, na.rm = TRUE)
+  ) %>%
+  rename(age = r_age) %>%
+  bind_rows(
+    filtered_data %>%
+      group_by(b_age) %>%
+      summarise(
+        avg_activity_score_b = mean(b_activity_score, na.rm = TRUE)
+      ) %>%
+      rename(age = b_age)
+  ) %>%
+  pivot_longer(cols = starts_with("avg_activity_score"), names_to = "fighter", values_to = "avg_activity_score")
+
+# Create the plot
+ggplot(activity_by_age, aes(x = age, y = avg_activity_score, color = fighter)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "Average Activity Score by Age (21-40)",
+    x = "Age",
+    y = "Average Activity Score",
+    color = "Fighter"
+  ) +
+  theme_minimal() +
+  scale_color_manual(labels = c("Blue Fighter", "Red Fighter"), values = c("blue", "red"))
+
+```
+
+Next, we will construct a metric attempting to measure the "finishing ability" of a fighter, or their ability to finish and win a fight based on a knockout, technical knockout, or submission. By finishing a fight, this allows for a more consistent gaurentwee of victory, as going to the judge's for a decision sometimes results in fighter losing when they expected to win. Variables are chosen to measure this finishing ability, while not overlapping with the activity score metric. Finishing rates per fight, as well as per round, are computed, standardized, and then summed. As we can see from the plots, the finishing score metrics also remian relatively symmetric about the expected value of zero. Meanwhile, the results from the lm_finishing_test logistic regression model are quite uprising. This linear model suggests that blue fighters having a higher finishing ability actually raises the probability of red winning when the odds are taken into account. This suggests that bettors are over betting on blue fighters with high finishing ability. Notably, these variables are no longer significant when looking at the 2+ prior fights for each opponent subset.While the finishing score appears to be a useful metric, it does not account for context in the quality of opponents or situation factors during fights. Incorporating opponent-quality-adjusted metrics could enhance the accuracy of the score in future analyses.
+
+```{r, echo=FALSE}
+# This code section calculates a finishing ability score for fighters, incorporating metrics like KO, submission, 
+# and doctor stoppage wins per fight and per win. These scores aim to measure finishing ability and evaluate its impact 
+# on fight outcomes using regression analysis.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Select and normalize finishing-related variables (excluding knockdowns)
+finishing_data <- cleaned_data %>%
+  mutate(
+    # Blue fighter finishing rate per round
+    b_finishing_per_round = ifelse(!is.na(b_total_rounds_fought) & b_total_rounds_fought > 0,
+                                   (b_wins_by_ko + b_wins_by_submission + b_wins_by_tko_doctor_stoppage) / b_total_rounds_fought,
+                                   NA),
+    
+    # Red fighter finishing rate per round
+    r_finishing_per_round = ifelse(!is.na(r_total_rounds_fought) & r_total_rounds_fought > 0,
+                                   (r_wins_by_ko + r_wins_by_submission + r_wins_by_tko_doctor_stoppage) / r_total_rounds_fought,
+                                   NA)
+  )
+
+
+# Step 2: Calculate per fight and per win metrics for Blue and Red fighters
+finishing_data <- finishing_data %>%
+  mutate(
+    # Blue fighter metrics per fight and per win
+    b_finishing_per_fight = ifelse(b_total_rounds_fought > 0,
+                                   (b_wins_by_ko + b_wins_by_submission + b_wins_by_tko_doctor_stoppage) / b_total_rounds_fought,
+                                   NA),
+    b_finishing_per_win = ifelse(b_wins > 0,
+                                 (b_wins_by_ko + b_wins_by_submission + b_wins_by_tko_doctor_stoppage) / b_wins,
+                                 NA),
+    
+    # Red fighter metrics per fight and per win
+    r_finishing_per_fight = ifelse(r_total_rounds_fought > 0,
+                                   (r_wins_by_ko + r_wins_by_submission + r_wins_by_tko_doctor_stoppage) / r_total_rounds_fought,
+                                   NA),
+    r_finishing_per_win = ifelse(r_wins > 0,
+                                 (r_wins_by_ko + r_wins_by_submission + r_wins_by_tko_doctor_stoppage) / r_wins,
+                                 NA)
+  )
+
+# Step 3: Combine finishing metrics for Blue and Red fighters into a unified dataset
+unified_finishing_data <- finishing_data %>%
+  dplyr::select(b_finishing_per_fight, b_finishing_per_win) %>%
+  rename_with(~ gsub("^b_", "", .)) %>%
+  bind_rows(
+    finishing_data %>%
+      dplyr::select(r_finishing_per_fight, r_finishing_per_win) %>%
+      rename_with(~ gsub("^r_", "", .))
+  )
+
+# Step 4: Standardize the unified dataset
+unified_finishing_scaled <- scale(unified_finishing_data, center = TRUE, scale = TRUE)
+
+# Step 5: Calculate a composite finishing score by summing the scaled values
+unified_finishing_data$enhanced_finishing_score <- rowSums(unified_finishing_scaled, na.rm = TRUE)
+
+# Step 6: Assign the finishing score back to Blue and Red fighters
+cleaned_data$b_finishing_score <- unified_finishing_data$enhanced_finishing_score[1:nrow(cleaned_data)]
+cleaned_data$r_finishing_score <- unified_finishing_data$enhanced_finishing_score[(nrow(cleaned_data) + 1):(2 * nrow(cleaned_data))]
+
+# Step 7: Verify the finishing score columns
+print("Summary of Blue Fighters' Finishing Scores:")
+print(summary(cleaned_data$b_finishing_score))
+
+print("Summary of Red Fighters' Finishing Scores:")
+print(summary(cleaned_data$r_finishing_score))
+
+# Step 8: 
+
+
+
+lm_finishing_test <- glm(winner ~ r_odds+r_finishing_score+b_finishing_score, family="binomial", data=cleaned_data)
+summary(lm_finishing_test)
+
+#
+
+```
+
+### c. Other Variables
+
+Next, we will construct a variable to measure the number of prior fights each fighter has had at the weightclass the fight in question is contested at. This variable aims to measure a fighter's familiarity and general experience within a specific weight class, which could influence their adaptability and comfort during the fight. We also create a binary variable to test whether or not the location of the given fight is in Las Vegas, which makes up the plurality of locations of UFC fights. THis could allow us to test forsignificant advantages or disadvantages to fighters, potentially due to factors such as travel, crowd support, or familiarity with the venue.From lm_prior_fights_test , we can observe neither prior fights metric is statistically signficant when the odds are already taken into account. Meanwhile the lm_vegas_test model suggests that fights occuring in Las Vegas as compared to other places is not signficant, but it should be noted that this point estimate is negative and it's p-value is somewhat close to the 0.05 threshold, approaching borderline signficiance.
+
+```{r, include=FALSE}
+# This code section creates a "total prior fights at fight's weight class" variable for both red and blue fighters. It also creates a binary variable to track whether or not the fight is occuring within Vegas or not. 
+# -----------------------------------------------------------------------------------
+
+
+# Combine r_fighter and b_fighter into a single column with weight class and date
+all_fights <- cleaned_data %>%
+  dplyr::select(r_fighter, weight_class, date) %>%
+  rename(fighter = r_fighter) %>%
+  bind_rows(
+    cleaned_data %>%
+      dplyr::select(b_fighter, weight_class, date) %>%
+      rename(fighter = b_fighter)
+  ) %>%
+  arrange(fighter, weight_class, date)
+
+# Add a column for the total number of prior fights within each weight class
+all_fights <- all_fights %>%
+  group_by(fighter, weight_class) %>%
+  mutate(prior_fights = row_number() - 1)
+
+# Join prior fight counts back into the main dataset for red and blue fighters
+cleaned_data <- cleaned_data %>%
+  left_join(all_fights, by = c("r_fighter" = "fighter", "weight_class", "date")) %>%
+  rename(r_prior_fights = prior_fights) %>%
+  left_join(all_fights, by = c("b_fighter" = "fighter", "weight_class", "date")) %>%
+  rename(b_prior_fights = prior_fights)
+
+# Verify the updated dataset
+# head(cleaned_data %>% select(r_fighter, b_fighter, weight_class, date, r_prior_fights, b_prior_fights)) %>% arrange(r_fighter, date)
+
+lm_prior_fights_test <- glm(winner ~ r_odds+r_prior_fights+b_prior_fights, data=cleaned_data, family="binomial")
+summary(lm_prior_fights_test)
+
+# Add Vegas indicator variable and model its impact
+cleaned_data <- cleaned_data %>%
+  mutate(vegas = location == "Las Vegas, Nevada, USA")
+
+lm_vegas_test <- glm(winner ~ r_odds+vegas, data=cleaned_data, family="binomial")
+summary(lm_vegas_test)
+
+```
+
+Next, a unified "ranking variable" is added to the data. In each weight class fighters are ranked beginning with champion (or rank 0), followed by the next top 15 competitors at that weight class. In the original data frames, each of these weight rankings is listed out in a separate column for each. The below code takes the average of all of a fighters rankings in all of the weightclasses they are ranked in. However, as only the top 15 contenders are ranked in any division, most fighters are actually unranked, which limits the size and power of this variable as a predictor. The lm_ranking_test model clearly shows a lack of significance for either ranking metric, which can be interpreted as the betting odds already taking this information into account. The overlapping histograms of red and blue fighter rankings align with our expectactions for the distribution of rankings between the two groups, with red generally having higher ranking values, and also with the expectation that most fighters red or blue are unranked.
+
+```{r, include=FALSE}
+# This code section creates and analyzes a unified ranking variable for fighters.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Identify columns containing "rank" for red (r_) and blue (b_) fighters
+r_rank_columns <- grep("^r_.*rank", colnames(cleaned_data), value = TRUE)
+b_rank_columns <- grep("^b_.*rank", colnames(cleaned_data), value = TRUE)
+
+# Step 2: Compute average rank for red fighters
+cleaned_data$r_Ranking <- apply(cleaned_data[, r_rank_columns], 1, function(x) {
+  numeric_ranks <- suppressWarnings(as.numeric(x))  # Convert to numeric, handle NAs
+  non_na_ranks <- numeric_ranks[!is.na(numeric_ranks)]  # Remove NAs
+  if (length(non_na_ranks) > 0) mean(non_na_ranks) else NA  # Return mean or NA
+})
+
+# Step 3: Compute average rank for blue fighters
+cleaned_data$b_Ranking <- apply(cleaned_data[, b_rank_columns], 1, function(x) {
+  numeric_ranks <- suppressWarnings(as.numeric(x))  # Convert to numeric, handle NAs
+  non_na_ranks <- numeric_ranks[!is.na(numeric_ranks)]  # Remove NAs
+  if (length(non_na_ranks) > 0) mean(non_na_ranks) else NA  # Return mean or NA
+})
+
+# Step 4: Verify the new rank variables
+table(cleaned_data$r_Ranking, useNA = "always")  # Include NA values in summary
+table(cleaned_data$b_Ranking, useNA = "always")  # Include NA values in summary
+
+# Step 5: Plot overlapping histograms of red and blue fighter rankings
+hist(cleaned_data$r_Ranking, col = rgb(1, 0, 0, 0.5), xlim = c(0, 15), 
+     main = "Overlapping Histograms of Fighter Rankings",
+     xlab = "Ranking", ylab = "Frequency", breaks = 15)
+hist(cleaned_data$b_Ranking, col = rgb(0, 0, 1, 0.5), add = TRUE, breaks = 15)
+
+# Add legend to the histogram
+legend("topright", legend = c("Red Fighter Rankings", "Blue Fighter Rankings"), 
+       fill = c(rgb(1, 0, 0, 0.5), rgb(0, 0, 1, 0.5)))
+
+
+lm_ranking_test <- glm(winner ~ r_odds+r_Ranking+b_Ranking,family="binomial", data=cleaned_data)
+summary(lm_ranking_test)
+```
+
+
+
+Factor analysis was then applied to uncover latent variables in the dataset, focusing on performance metrics for red and blue fighters. Weight-class-specific ranking variables were removed to avoid confounding effects, and numeric variables for both red and blue fighters were standardized to ensure that differences in scale or units did not disproportionately influence the factor analysis. A scree plot of eigenvalues was used to determine the number of factors, with 4 factors chosen due to a noticeable drop in explanatory power beginning with the 5th factor.
+
+The factor scores for red and blue fighters were calculated, and the loadings revealed considerable overlap between the red and blue factors, indicating that similar patterns of underlying skills and characteristics are present across both groups. The logistic regression model (lm_factors_test) showed that for both red and blue fighters, Factor 3 was significant at the alpha=0.05 level when betting odds were included. Red Factor 3 is dominated by variables involving ground control, such as ground position control time, strikes attempted on the ground, and total strikes attempted, whereas Blue Factor 3 captures similar variables but focuses on strikes attempted and landed on the ground. The two factors provide complementary insights rather than redundancy, with Blue Factor 3 reflecting more offensive measures, while Red Factor 3 emphasizes control and positional dominance.
+
+The lack of significance for the other factors suggests that their information is already accounted for by the betting odds and does not contribute additional predictive power. This result highlights that the betting odds capture much of the fighters' overall skill and performance metrics. While the factors provide a simplified summary of fighter characteristics, the reliance on selected numeric variables and exclusion of non-numeric data may limit their generalizability and interpretability.
+
+
+```{r, echo=FALSE}
+# This section performs Factor Analysis to reduce dimensionality for both Red and Blue fighters.
+# It includes data preprocessing, scaling, handling missing values, and generating factor scores.
+# -----------------------------------------------------------------------------------
+
+# Remove ranking columns from the dataset
+cleaned_data_factor <- cleaned_data %>%
+  dplyr::select(-all_of(r_rank_columns), -all_of(b_rank_columns))
+
+# Subset data for Blue fighters
+blue_data <- cleaned_data_factor %>% 
+  dplyr::select(starts_with("b_"))
+
+# Subset data for Red fighters
+red_data <- cleaned_data_factor %>% 
+  dplyr::select(starts_with("r_")) %>% 
+  dplyr::select(-r_fighter)
+
+# Select numeric columns for Blue and Red fighters
+blue_data_numeric <- blue_data %>% 
+  dplyr::select(where(is.numeric))
+
+red_data_numeric <- red_data %>% 
+  dplyr::select(where(is.numeric))
+
+
+# Scale data for Blue fighters
+blue_scaled <- scale(blue_data_numeric, center = TRUE, scale = TRUE)
+
+# Scale data for Red fighters
+red_scaled <- scale(red_data_numeric, center = TRUE, scale = TRUE)
+
+
+# Remove columns with missing or infinite values
+blue_scaled_clean <- blue_scaled[, colSums(is.na(blue_scaled)) == 0 & colSums(is.infinite(blue_scaled)) == 0]
+
+
+# Calculate the eigenvalues of the correlation matrix
+eigenvalues <- eigen(cor(blue_scaled_clean))$values  # Use the scaled data for blue fighters
+
+# Create a scree plot
+plot(
+  eigenvalues,
+  type = "b",  # Points and lines
+  pch = 19,    # Solid circle points
+  xlab = "Factor Number",
+  ylab = "Eigenvalue",
+  main = "Scree Plot for Factor Analysis",
+  col = "blue"
+)
+
+# Add a horizontal line at eigenvalue = 1 for Kaiser criterion
+abline(h = 1, col = "red", lty = 2)
+
+# Handle missing values in scaled data
+# Identify variables with missing values in blue_scaled
+blue_missing_counts <- colSums(is.na(blue_scaled))
+# print("Missing values in Blue scaled data:")
+# print(blue_missing_counts)
+
+# Identify variables with missing values in red_scaled
+red_missing_counts <- colSums(is.na(red_scaled))
+# print("Missing values in Red scaled data:")
+# print(red_missing_counts)
+
+# Drop columns with missing values in Blue scaled data
+blue_scaled <- blue_scaled[, colSums(is.na(blue_scaled)) == 0]
+
+# Drop columns with missing values in Red scaled data
+red_scaled <- red_scaled[, colSums(is.na(red_scaled)) == 0]
+
+# Perform Factor Analysis for Blue fighters
+blue_fa <- fa(blue_scaled, nfactors = 4, rotate = "varimax")  # Adjusted nfactors based on scree plot 
+
+# Extract factor scores for Blue fighters
+blue_factor_scores <- as.data.frame(factor.scores(blue_scaled, blue_fa)$scores)
+
+# Rename factor scores for clarity
+colnames(blue_factor_scores) <- c("b_factor1", "b_factor2", "b_factor3", "b_factor4")  
+
+# Perform Factor Analysis for Red fighters
+red_fa <- fa(red_scaled, nfactors = 4, rotate = "varimax")  # Adjust nfactors based on scree plot or domain knowledge
+
+# Extract factor scores for Red fighters
+red_factor_scores <- as.data.frame(factor.scores(red_scaled, red_fa)$scores)
+
+# Rename factor scores for clarity
+blue_factor_scores <- blue_factor_scores %>%
+  rename_with(~ c("b_factor1_StrikingAbility",
+                  "b_factor2_ExperienceAndResilience",
+                  "b_factor3_GrapplingAbility",
+                  "b_factor4_OpponentGrapplingCaliber"))
+red_factor_scores <- red_factor_scores %>%
+  rename_with(~ c("r_factor1_StrikingAbility",
+                  "r_factor2_ExperienceAndResilience",
+                  "r_factor3_GrapplingAbility",
+                  "r_factor4_OpponentGrapplingCaliber"))
+
+
+
+# View the dataset with factor scores
+# print("Dataset with Factor Scores (Head):")
+# head(cleaned_data_with_factors)
+
+
+
+# Get the factor loadings for both Red and Blue fighters
+red_loadings <- red_fa$loadings
+blue_loadings <- blue_fa$loadings
+
+# Extract the top variables for each factor
+top_red_variables <- get_top_variables(red_loadings, num_top = 5)
+top_blue_variables <- get_top_variables(blue_loadings, num_top = 5)
+
+# Combine results into a data frame for better visualization
+red_table <- data.frame(
+  Factor = paste0("Red_Factor", 1:ncol(red_loadings)),
+  Top_Variables = apply(top_red_variables, 2, paste, collapse = ", ")
+)
+
+blue_table <- data.frame(
+  Factor = paste0("Blue_Factor", 1:ncol(blue_loadings)),
+  Top_Variables = apply(top_blue_variables, 2, paste, collapse = ", ")
+)
+
+# Print the tables
+cat("Top Variables for Red Factors:\n")
+print(red_table)
+
+cat("\nTop Variables for Blue Factors:\n")
+print(blue_table)
+
+
+
+
+# Combine factor scores for Red and Blue fighters into the cleaned_data dataset
+cleaned_data <- cleaned_data %>%
+  bind_cols(blue_factor_scores) %>%
+  bind_cols(red_factor_scores)
+
+# Verify the updated dataset
+# cat("Updated cleaned_data with factor scores:\n")
+# print(head(cleaned_data))
+
+lm_factors_test <- glm(winner ~ r_odds + 
+                        r_factor1_StrikingAbility + 
+                        r_factor2_ExperienceAndResilience + 
+                        r_factor3_GrapplingAbility + 
+                        r_factor4_OpponentGrapplingCaliber + 
+                        b_factor1_StrikingAbility + 
+                        b_factor2_ExperienceAndResilience + 
+                        b_factor3_GrapplingAbility + 
+                        b_factor4_OpponentGrapplingCaliber, 
+                      data = cleaned_data, 
+                      family = "binomial")
+
+# Display the summary of the model
+summary(lm_factors_test)
+
+```
+
+## iv. Exploratory Data Analysis
+
+Finally, we will conclude this section by conducting some exploratory data analysis. Before doing so, we will print a table describing all of the major variables involving in the exploration and analysis.
+
+$$
+\begin{array}{|>{\raggedright\arraybackslash}p{5cm}|>{\raggedright\arraybackslash}p{10cm}|}
+\hline
+\textbf{Variable} & \textbf{Definition} \\ \hline
+\textbf{\texttt{r\_}} & Prefix indicating variables specific to the red fighter \\
+\hline
+\textbf{\texttt{b\_}} & Prefix indicating variables specific to the blue fighter \\
+\hline
+\texttt{odds} & Implied probability of winning according to betting market \\
+\hline
+\texttt{activity\_score} & Activity score for the fighter \\
+\hline
+\texttt{finishing\_score} & Finishing score for the fighter \\
+\hline
+\texttt{age\_over\_34} & Indicator if the fighter is over 34 years old \\
+\hline
+\texttt{prior\_fights} & Number of prior fights for the fighter in the weight class \\
+\hline
+\texttt{Ranking} & Average rank of the fighter across weight classes \\
+\hline
+\texttt{total\_rounds\_fought} & Total rounds fought by the fighter \\
+\hline
+\texttt{wins} & Total wins by the fighter \\
+\hline
+\texttt{height\_cms} & Height of the fighter (in cm) \\
+\hline
+\texttt{reach\_cms} & Reach/wingspan of the fighter (in cm) \\
+\hline
+\texttt{current\_win\_streak} & Current win streak of the fighter \\
+\hline
+\texttt{current\_lose\_streak} & Current losing streak of the fighter \\
+\hline
+\texttt{avg\_sig\_str\_landed} & Average significant strikes landed per fight \\
+\hline
+\texttt{avg\_td\_pct} & Takedown percentage for the fighter \\
+\hline
+\texttt{wins\_by\_ko} & Wins by knockout for the fighter \\
+\hline
+\texttt{wins\_by\_submission} & Wins by submission for the fighter \\
+\hline
+\texttt{wins\_by\_tko\_doctor\_stoppage} & Wins by TKO/doctor stoppage for the fighter \\
+\hline
+\texttt{factor1\_StrikingAbility} & First latent factor, representing striking ability \\
+\hline
+\texttt{factor2\_ExperienceAndResilience} & Second latent factor, representing experience and resilience \\
+\hline
+\texttt{factor3\_GrapplingAbility} & Third latent factor, representing grappling ability \\
+\hline
+\texttt{factor4\_OpponentGrapplingCaliber} & Fourth latent factor, representing opponent grappling caliber \\
+\hline
+\texttt{style\_matchup} & Style matchup between the red and blue fighters \\
+\hline
+\texttt{style\_cluster} & Cluster label indicating fighting style classification \\
+\hline
+\texttt{avg\_sig\_str\_att} & Average significant strikes attempted per fight \\
+\hline
+\texttt{avg\_sig\_str\_landed} & Average significant strikes landed per fight \\
+\hline
+\texttt{avg\_td\_att} & Average takedowns attempted per fight \\
+\hline
+\texttt{avg\_td\_landed} & Average takedowns landed per fight \\
+\hline
+\texttt{avg\_sub\_att} & Average submission attempts per fight \\
+\hline
+\texttt{avg\_ctrl\_time\_seconds} & Average control time in seconds per fight \\
+\hline
+\texttt{vegas} & Indicator if the fight occurred in Las Vegas, Nevada \\
+\hline
+\end{array}
+$$
+
+
+
+
+First, we display the means for several key variables, some of which were constructed in this section. From the summary statistics, it is evident that red fighters generally have slightly higher average activity and finishing scores compared to blue fighters, which may contribute to their tendency to be favored in betting odds. Next, we look at the distribution of ages of fighters, which is fairly symmetric and mostly overlapping for red and blue fighters. We also take a look at the distribution of both r_odds and b_odds, from which it is clear that red fighters are generally the favorite. We also can see the win rate for red fighters per weight division, with the only major note being that the Women's featherweight division suffers from an extremely small sample size of fights.The table next to that displays the top 10 style matchups by percentage of red wins, along with the number of fights in which that specific match up has occurred. Finally, graphs are plotted to display the distributions of activity scores, finishing scores, and the factor scores. One important part to note is the extreme variation that is seen in both rd factor 2 and blue factor two, which is not otherwise seen.
+
+```{r, echo=FALSE}
+# This section performs exploratory data analysis (EDA) on key features of the dataset.
+# It includes summary statistics, distributions, and visualizations to understand data characteristics.
+# -----------------------------------------------------------------------------------
+
+# Summary Statistics
+summary_stats <- cleaned_data %>%
+  summarise(
+    avg_age_r = mean(r_age, na.rm = TRUE),
+    avg_age_b = mean(b_age, na.rm = TRUE),
+    avg_odds_r = mean(r_odds, na.rm = TRUE),
+    avg_odds_b = mean(b_odds, na.rm = TRUE),
+    avg_activity_r = mean(r_activity_score, na.rm = TRUE),
+    avg_activity_b = mean(b_activity_score, na.rm = TRUE),
+    avg_finishing_r = mean(r_finishing_score, na.rm = TRUE),
+    avg_finishing_b = mean(b_finishing_score, na.rm = TRUE)
+  )
+
+print("Summary Statistics:")
+print(summary_stats)
+
+# Combine Red and Blue Age Distribution
+ggplot(cleaned_data) +
+  geom_histogram(aes(x = r_age, fill = "Red"), binwidth = 2, alpha = 0.5, color = "black") +
+  geom_histogram(aes(x = b_age, fill = "Blue"), binwidth = 2, alpha = 0.5, color = "black") +
+  scale_fill_manual(values = c("Red" = "red", "Blue" = "blue")) +
+  labs(
+    title = "Age Distribution of Fighters",
+    x = "Age",
+    y = "Count",
+    fill = "Fighter Corner"
+  ) +
+  theme_minimal()
+
+# Combine Odds Distribution
+ggplot(cleaned_data) +
+  geom_histogram(aes(x = r_odds, fill = "Red"), binwidth = 0.05, alpha = 0.5, color = "black") +
+  geom_histogram(aes(x = b_odds, fill = "Blue"), binwidth = 0.05, alpha = 0.5, color = "black") +
+  scale_fill_manual(values = c("Red" = "red", "Blue" = "blue")) +
+  labs(
+    title = "Odds Distribution for Fighters",
+    x = "Odds",
+    y = "Count",
+    fill = "Fighter Corner"
+  ) +
+  theme_minimal()
+
+# Winning Rate by Weight Class
+win_rate_by_weight_class <- cleaned_data %>%
+  group_by(weight_class) %>%
+  summarise(
+    red_win_rate = mean(winner, na.rm = TRUE),
+    total_fights = n()
+  )
+
+print("Winning Rate by Weight Class:")
+print(win_rate_by_weight_class)
+
+ggplot(win_rate_by_weight_class, aes(x = weight_class, y = red_win_rate)) +
+  geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
+  labs(
+    title = "Winning Rate of Red Fighters by Weight Class",
+    x = "Weight Class",
+    y = "Winning Rate"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Style Matchup Impact
+style_matchup_summary <- cleaned_data %>%
+  group_by(style_matchup) %>%
+  summarise(
+    avg_win_rate = mean(winner, na.rm = TRUE),
+    total_fights = n()
+  ) %>%
+  arrange(desc(avg_win_rate))
+
+print("Style Matchup Win Rates:")
+print(head(style_matchup_summary, 10))
+
+# Combine Activity Score Distribution
+ggplot(cleaned_data) +
+  geom_histogram(aes(x = r_activity_score, fill = "Red"), binwidth = 0.5, alpha = 0.5, color = "black") +
+  geom_histogram(aes(x = b_activity_score, fill = "Blue"), binwidth = 0.5, alpha = 0.5, color = "black") +
+  scale_fill_manual(values = c("Red" = "red", "Blue" = "blue")) +
+  labs(
+    title = "Activity Score Distribution for Fighters",
+    x = "Activity Score",
+    y = "Count",
+    fill = "Fighter Corner"
+  ) +
+  theme_minimal()
+
+# Combine Finishing Score Distribution
+ggplot(cleaned_data) +
+  geom_histogram(aes(x = r_finishing_score, fill = "Red"), binwidth = 0.5, alpha = 0.5, color = "black") +
+  geom_histogram(aes(x = b_finishing_score, fill = "Blue"), binwidth = 0.5, alpha = 0.5, color = "black") +
+  scale_fill_manual(values = c("Red" = "red", "Blue" = "blue")) +
+  labs(
+    title = "Finishing Score Distribution for Fighters",
+    x = "Finishing Score",
+    y = "Count",
+    fill = "Fighter Corner"
+  ) +
+  theme_minimal()
+
+
+
+
+
+
+# Select and reshape factor data for visualization
+factor_data <- cleaned_data %>%
+  dplyr::select(starts_with("r_factor"), starts_with("b_factor")) %>%
+  pivot_longer(cols = everything(), names_to = "factor", values_to = "value")
+
+# Print reshaped factor data
+print("Factor data reshaped successfully:")
+print(head(factor_data))
+
+# Example visualization of factor data
+ggplot(factor_data, aes(x = factor, y = value, fill = factor)) +
+  geom_boxplot() +
+  labs(
+    title = "Distribution of Factors for Fighters",
+    x = "Factors",
+    y = "Values"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+```
+
+Age is an important predictor of fight outcomes, and so it is also important to analyze how it impacts winning probability. In the following section, Win probabilites for each age are plotted for all ages with at least 30 fighters fighting at that age, in order to ensure reasonable sample sizes. From the plot, it is clear that there is a sharp downward turn. However, the relationship might be more complicated that what is visually obvious. Fighters tend to face weak competition when they are younger and first entering the ufc, often hitting their competitive primes around the age of 30, before slowing down and diminsing in performance ability. As such, the "fighter ability over time" graph is generally thought of as being quadratic rather than linear.
+
+```{r, echo=FALSE}
+# This code section calculates the winning rate by age for fighters, considering both Red and Blue fighters,
+# and visualizes the relationship between age and winning probability using a line plot.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Prepare data for Red and Blue fighters
+red_fighter_data <- cleaned_data %>%
+  dplyr::select(age = r_age, win = winner)  # 'winner' is 1 for Red win
+
+blue_fighter_data <- cleaned_data %>%
+  dplyr::select(age = b_age) %>%
+  mutate(win = ifelse(cleaned_data$winner == 0, 1, 0))  # 1 for Blue win (inverse of 'winner')
+
+# Step 2: Combine Red and Blue fighter data into a single dataset
+age_win_data <- bind_rows(red_fighter_data, blue_fighter_data) %>%
+  group_by(age) %>%
+  summarise(
+    total_fighters = n(),  # Count total fighters at each age
+    winning_rate = mean(win, na.rm = TRUE)  # Calculate winning rate
+  ) %>%
+  filter(total_fighters >= 30)  # Keep only ages with at least 30 fighters
+
+# Step 3: Plot the winning rate by age
+ggplot(age_win_data, aes(x = age, y = winning_rate)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(
+    title = "Winning Rate of Fighters by Age",
+    x = "Age",
+    y = "Winning Rate"
+  ) +
+  theme_minimal()
+
+
+```
+
+These exploratory insights suggest that while some patterns, like fighter activity, may already be incorporated and partially incoperatedinto betting odds, other nuanced factors, such as style match ups and variability in specific factors, may present opportunities for better prediction models.
+
+
+\newpage
+
+# Methodology
+
+## i. Statistical Models
+
+In order to make predictions on the binary fight outcomes and better understand the relationship between predictors and the outcome, we will now proceed to test several statistical methods aimed at properly classifying fight outcomes. This will come in two primary forms, first is a series of logistic regression models, aimed at predicting the outcome of a fight based on it's regressors. Logistic regression offers a straightforward way of estimating the probability of a chance event, making it particularly suited for binary predictions such as fight winners. The second main form we will use is the discriminant analysis model, which well let us form decision boundaries which will allow us to classify fights into outcomes based on predictor values using discriminant functions. Discriminant analysis, on the other hand, performs well at classification when predictors follow multivariate normal distributions, creating sharp decision boundaries for classification. For both forms of analysis, we will employ cross-validation in order to maintain robustness and guard against overfitting. For computational effiency, k-fold cross validation is run with a default k of 5.
+
+### a. Logistic Regresion Models
+
+First, we begin with the logistic regression models. As mentioned, f-fold cross-validation is used to ensure that model performance is evaluated on multiple subsets of the data, reducing the chance over fitting and providing a more robust estimations. The following section of code forms the cross-validated glm logistic regression models for several of the key variables. The r_odds model employs only r_odds as a predictor of winner. All other models also include r_odds as a predictor. The 35_curse model tests the hypothesis that fighters aged 35 or older are at a disadvantage, while the factors model evaluates the predictive power of the latent variables derived from factor analysis. The style_matchup and style models employ the style_match up and style variables respectively, which were gathered from the k-means clustering analysis.
+
+The regression tables of these models are then displayed one by one. Notably, in all models r_odds is an extremely signficant predictor. Notably, none of the coefficents are statistically signficant in the style matchup regression other than the r_odds variable, which can be interpretted as none of the style matchups leading to statistically signficant differenced from the "Balanced vs. Balanced" baseline matchup. For the style table, the only statistically signficant coeffcient is PowerStriker, which performs worse than the baseline of BalancedWrestler. For the activity score regresion, BOTh the red and blue activity scores are statistically signifcant under an alpha of 0.05 even when taking the odds into account. Additionally, the coefficents are what we would expect, red fighters being more active and blue fighters being less active both contribute to a higher chance of a red victory.For the finishing score variable, once again the coeffcient for blue finishing score is statistically signfifcant and negative, suggesting bettors are overbetting on fighters with a high finishing rate. Next, for the 35 or older variable, neither coeffcient is statistically signifcant. As age is an objective measurement and widely available, this is intuitive. Finally, the factors model is quite strange in that the only signifcant coefficents aside from the odds that are signifcant are the third factors for red and blue fighters. THis is strange both because these factors represent differing qualitys, and also because these variables exhibited much less variation across fighters than the second factors, neither of which are signifcant. For now, we have constructed and analyzed several basic linear models. We will now move on to create two models which are slightly more complicated in terms of their construction.
+
+```{r, echo=FALSE}
+# This code section summarizes logistic regression models into a single table.
+# -----------------------------------------------------------------------------------
+final_data <- cleaned_data
+
+# Ensure the outcome variable 'winner' is a factor for binary classification
+final_data$winner <- as.factor(final_data$winner)
+
+# Set up cross-validation
+cv_folds <- trainControl(method = "cv", number = 5, savePredictions = "final")
+
+# Run and summarize selected logistic regression models
+# LM with just r_odds as the predictor
+lm_r_odds <- train(
+  winner ~ r_odds, 
+  data = final_data, 
+  method = "glm", 
+  family = "binomial", 
+  trControl = cv_folds
+)
+
+
+
+# LM with r_odds and style_matchup as predictors
+lm_style_matchup <- train(
+  winner ~ r_odds + style_matchup, 
+  data = final_data, 
+  method = "glm", 
+  family = "binomial", 
+  trControl = cv_folds
+)
+
+# LM with r_odds and styles predictors
+lm_style <- train(
+  winner ~ r_odds + r_style_cluster + b_style_cluster, 
+  data = final_data, 
+  method = "glm", 
+  family = "binomial", 
+  trControl = cv_folds
+)
+
+# LM with r_odds, blue and red activity scores as predictors
+lm_activity <- train(
+  winner ~ r_odds + b_activity_score + r_activity_score, 
+  data = final_data, 
+  method = "glm", 
+  family = "binomial", 
+  trControl = cv_folds
+)
+
+# LM with r_odds, blue and red finishing scores as predictors
+lm_finishing <- train(
+  winner ~ r_odds + b_finishing_score + r_finishing_score, 
+  data = final_data, 
+  method = "glm", 
+  family = "binomial", 
+  trControl = cv_folds
+)
+
+# LM with r_odds and age over 34 for red and blue fighters
+lm_35_curse <- train(
+  winner ~ r_odds + r_age_over_34 + b_age_over_34, 
+  data = final_data, 
+  method = "glm", 
+  family = "binomial", 
+  trControl = cv_folds
+)
+
+
+
+lm_factors <- train(
+  winner ~ r_odds + r_age_over_34 + b_age_over_34 + 
+    r_factor1_StrikingAbility + r_factor2_ExperienceAndResilience + 
+    r_factor3_GrapplingAbility + r_factor4_OpponentGrapplingCaliber + 
+    b_factor1_StrikingAbility + b_factor2_ExperienceAndResilience + 
+    b_factor3_GrapplingAbility + b_factor4_OpponentGrapplingCaliber, 
+  data = final_data, 
+  method = "glm", 
+  family = "binomial", 
+  trControl = cv_folds
+)
+
+
+glm_r_odds <- lm_r_odds$finalModel
+glm_style_matchup <- lm_style_matchup$finalModel
+glm_style <- lm_style$finalModel
+glm_activity <- lm_activity$finalModel
+glm_finishing <- lm_finishing$finalModel
+glm_35_curse <- lm_35_curse$finalModel
+glm_r_odds <- lm_r_odds$finalModel
+glm_factors <- lm_factors$finalModel
+
+
+options(scipen = 999)
+
+# Extract model coefficients and convert them to a tidy format
+model_list <- list(
+  r_odds = tidy(glm_r_odds),
+  style_matchup = tidy(glm_style_matchup),
+  style=tidy(glm_style),
+  activity = tidy(glm_activity),
+  finishing = tidy(glm_finishing),
+  curse = tidy(glm_35_curse),
+  factors = tidy(glm_factors)
+)
+
+
+# Print tidy summaries for each model
+for (model_name in names(model_list)) {
+  cat("\nModel:", model_name, "\n")
+  
+  # Extract the tidy data frame for the model
+  model_summary <- model_list[[model_name]]
+  
+  # Print the tidy summary
+  print(model_summary)
+  
+  cat("\n--------------------------------------------------\n")
+}
+
+
+
+
+# View(summary_table)
+
+```
+
+Next, we will use stepwise regression in order to generate a model, the step wise model, that selects the best predictive variables based on AIC. Stepwise regression can be used to systematically select predictive variables, one at a time, picking the variable that contributes most to the model's accuracy while. By starting from a null model and iteratively adding or removing predictors, and judging using AIC rather than direct fit, stepwise regression can ensure that only the variables with the most significant impact on the outcome remain in the final model. One notable limiation to this stepwise regression is that it can miss interactions or nonlinear effects, and still may deal with overfitting. The stepwise regression is also applied across the full range of available predictors, including novel variables derived from previous sections of the paper.
+
+To ensure that the stepwise regression algorithm functions efficiently and accurately, we first begin by preprocess the data and removing variables with excessive missing values or high cardinality (categorical variables with many classes). This is done in order to make sure the code can run, as well as the fact that those with numerous unique categories can run to issues involving computational inefficiency and overfitting. By evaluating the model's performance using multiple data splits through 5-fold cross validation, we are able assess how well the stepwise regression does at generalizing to unseen data. As there are approximately 200 variables, and all results are cross validated, this section of code may take some time to run. The code begins by filtering out problematic columns which would impede the stepwisse regression, such as those with many NA values, or large categorical variables. Finally, stepwise regression is performed, and the final model is displayed in the output below.
+
+The final stepwise model's output includes the coefficients, standard errors, and p-values of the selected predictors. These results help identify which variables are most impactful in predicting fight outcomes. Interestingly, the only novel variable that is selected in the final step wise model is the binary vegas variable. This variables lack of complexity likely explains why it, over a variable like style_matchup with 35 classes, was chosen.
+
+```{r, include=FALSE}
+# This code section performs preprocessing to remove problematic columns, reduce dimensionality, 
+# and execute stepwise regression to select the best predictive variables based on AIC.
+# -----------------------------------------------------------------------------------
+
+# Identify columns with 50 or fewer NA values
+columns_to_keep <- colSums(is.na(final_data)) <= 10
+
+
+cut_columns <- colSums(is.na(final_data)) > 10
+cut_columns <- final_data[cut_columns]
+
+
+# Filter out columns with more than 50 NA values
+final_data <- final_data[, columns_to_keep]
+
+# Verify the updated dataset
+missing_summary <- colSums(is.na(final_data))
+missing_summary <- missing_summary[missing_summary > 0]
+
+stepwise_data <- final_data %>%
+  dplyr::select(where(~ n_distinct(.) > 1))
+
+# Remove columns with more than 10 unique categories/strings
+stepwise_data <- stepwise_data %>%
+  dplyr::select(where(~ is.numeric(.) || n_distinct(.) <= 10))
+
+
+
+# Filter complete cases for the stepwise regression
+stepwise_data <- stepwise_data %>%
+  dplyr::filter(complete.cases(.))
+
+# Define full and null models
+full_model <- glm(
+  winner ~ ., 
+  data = stepwise_data, 
+  family = "binomial"
+)
+null_model <- glm(
+  winner ~ 1, 
+  data = stepwise_data, 
+  family = "binomial"
+)
+
+# Perform stepwise regression
+lm_stepwise <- stepAIC(
+  object = null_model, 
+  scope = list(lower = null_model, upper = full_model), 
+  direction = "both", 
+  trace = FALSE
+)
+
+# Summary of the final model
+summary(lm_stepwise)
+
+
+
+```
+
+The next model, noted as the "super" model is aimed at integrating the strengths of both the stepwise-selected variables and the novel variables we developed in our previous analysis. By combining these sets, we hope to capture a more comprehensive range of predictive factors that influence fight outcomes. While this does sacrifcy some complexitity and statistical power, it does so in the goal of leading to a higher prediction ability. While stepwise regression is mostly effective in selecting variables that optimize AIC values, it may exclude important predictors that have practical significance due to complexity or multicollinearity. An example of variable like this is style_matchup, which may be excluded despite their potential predictive power. Additionally, but looking at the prediction accuracy of both the stepwise model and the super model, we can clearly identify the specific growth in accuracy caused by the novel variables, as only the Vegas variable is included in the stepwise model. The manually created variables are potentially useful in measuring nuanced aspects of fighter performance and strategy that are not reflected in the standard fight statistics. As much of this analysis is aimed at finding new information, we feel it is best to also run a model with the novel variables as it mazimizes that chance.
+
+```{r, include=FALSE}
+# This code section combines the stepwise-selected variables with the in-code-created variables to fit a final "super" model
+# -----------------------------------------------------------------------------------
+
+# Step 1: Define the manually created variables to include in the final model
+manual_vars <- c(
+  "style_matchup",
+  "b_activity_score",
+  "r_activity_score",
+  "b_finishing_score",
+  "r_finishing_score",
+  "r_prior_fights",
+  "b_prior_fights",
+  "vegas",
+  "r_age_over_34",
+  "b_age_over_34",
+  "r_factor1_StrikingAbility",
+  "r_factor2_ExperienceAndResilience",
+  "r_factor3_GrapplingAbility",
+  "r_factor4_OpponentGrapplingCaliber",
+  "b_factor1_StrikingAbility",
+  "b_factor2_ExperienceAndResilience",
+  "b_factor3_GrapplingAbility",
+  "b_factor4_OpponentGrapplingCaliber"
+)
+
+
+
+# Step 2: Extract the variables from the stepwise-selected model
+stepwise_vars <- all.vars(lm_stepwise$call$formula)
+
+# Step 3: Combine stepwise-selected variables with the manually created variables
+final_vars <- unique(c(stepwise_vars, manual_vars))
+
+final_vars <- final_vars[!final_vars=="r_win_by_decision_split"]
+
+# Step 4: Create a formula for the final model
+final_model_formula <- as.formula(
+  paste("winner ~", paste(final_vars, collapse = " + "))
+)
+
+# Step 5: Fit the final model with both stepwise-selected and manually created variables
+lm_super <- glm(
+  formula = final_model_formula, 
+  data = final_data, 
+  family = "binomial"
+)
+
+# Step 6: Summarize the final model
+summary(lm_super)
+
+```
+
+Finally, the below code focuses on implementing LASSO regression, which was chosen as it is capable of performing variable selection by penalizing the absolute size of coefficients, effectively setting the less useful predictors to zero. hHis provides an alternative way of addressing multicollinearity and helping to prevent over fitting. Given the extremely high dimensionality of the dataset, having well over 200 variables, LASSO's ability to streamline predictors is potnetially helpful in improving model interpretability and computational efficiency. Cross-validation is once again implemented as it ensures that the optimal lambda value is robust and not overfitting the training data. A cross-validated LASSO regression was run, and the accuracy of this model is noted as being 0.6161. Notably, this was lower than that of other logistic regression models, even those which just include r_odds and nothing else, as will be seen later in section five. This suggests that although LASSO is effective at variable selection, it may not fully capture the complexity of fight outcomes when it comes to predicting fight outcomes. Finally, the included variables are listed in descending order of the coefficient in the model. The inclusion of red_factor4 and both finishing score variables underscores the potential impact of ground control and finishing ability in determining fight outcomes, suggesting that these aspects of fighting may not be fully captured by the current betting odds.
+
+```{r, include=FALSE}
+# LASSO Logistic Regression for Fight Outcome Prediction
+# -----------------------------------------------------------------------------------
+
+# Load required libraries
+library(glmnet)
+
+# Step 1: Prepare Dataset
+X <- final_data[, -which(names(final_data) == "winner")]
+X <- X[, sapply(X, is.numeric)]  # Keep numeric columns only
+X <- X[, !grepl("odds|predict|expected", names(X))]  # Exclude specific columns
+Y <- as.numeric(final_data$winner) - 1  # Convert 'winner' to binary (1 or 0)
+
+# Step 2: Handle One-Hot Encoding for 'style_matchup'
+if ("style_matchup" %in% names(final_data)) {
+  X_encoded <- model.matrix(~ style_matchup - 1, data = final_data)  # One-hot encode
+  X <- cbind(X, X_encoded)  # Combine with existing data
+}
+
+# Step 3: Split Data into Training and Testing Sets
+set.seed(42)  # For reproducibility
+train_index <- sample(1:nrow(X), size = 0.8 * nrow(X), replace = FALSE)
+trainX <- as.matrix(X[train_index, ])
+trainY <- Y[train_index]
+testX <- as.matrix(X[-train_index, ])
+testY <- Y[-train_index]
+
+# Step 4: Perform LASSO Logistic Regression with Cross-Validation
+cv_lasso <- cv.glmnet(trainX, trainY, alpha = 1, family = "binomial")
+
+
+# Step 5: Extract Optimal Lambda
+best_lambda <- cv_lasso$lambda.min
+cat("Optimal Lambda:", best_lambda, "\n")
+
+# Step 6: Make Predictions on Test Set
+predicted_probs <- predict(cv_lasso, newx = testX, s = best_lambda, type = "response")
+predictions <- ifelse(predicted_probs > 0.5, 1, 0)
+
+# Step 7: Evaluate Model Accuracy
+accuracy <- mean(predictions == testY)
+cat("Accuracy:", accuracy, "\n")
+
+# Step 8: Extract Non-Zero Coefficients
+feature_importance <- coef(cv_lasso, s = best_lambda)
+feature_importance <- as.data.frame(as.matrix(feature_importance))
+feature_importance$Feature <- rownames(feature_importance)
+colnames(feature_importance)[1] <- "Coefficient"
+feature_importance <- feature_importance[feature_importance$Coefficient != 0, ]
+
+# Step 9: Display Important Features
+feature_importance <- feature_importance[order(-abs(feature_importance$Coefficient)), ]
+cat("Significant Features:\n")
+print(feature_importance)
+
+```
+
+### b. Discriminant Analysis Models
+
+The next section of the paper focuses on using discriminant anlaysis to descriminate between which fights result in red wins and losses. We begin with the simplest form of discriminant analysis, linear discriminant analysis (LDA). It is critical to evaluate whether the LDA assumptions hold for this dataset, particularly the normality of predictors and equal covariance matrices across classes. Violations of these assumptions could affect the model's performance and interpretation. As we can see from our tests of these assumptions, it appears that there are mixed results. The data does not appear to violate the multivariate skeweness assumption, but does violate the Kurtosis assumption, implying that the data may have heavy tails or outliers. Finally, the multivariate normality test of the predictors results in an NA value. This is likely due to aliases / linear depenencies among the predictor variables, such as the red and blue odds determining eachother. This results suggest that LDA, and DA in general, might not be an appropriate fit for the data. Nonetheless, we proceed by running LDA on a subset of predictors with no missing values. This LDA model is used to create a linear decision boundry, which is then used to classify fights into predicted outcomes. With 5-fold cross validation, the overall misclassification rate is 0.359609, indicating a prediction accuracy rate of approximately 64%. As we will find out in section 5, this is mostly comparable with the logistic regression models created in the previous section.
+
+```{r, echo=FALSE, eval=FALSE}
+# Linear Discriminant Analysis (LDA): Predicting Winning and Losing Fighters
+# -----------------------------------------------------------------------------------
+# This code section implements Linear Discriminant Analysis (LDA) to predict fight outcomes 
+# (winning vs. losing) using a cleaned dataset. It includes model fitting, evaluation, 
+# visualizing the decision boundary, and calculating the misclassification rate with 5-fold CV.
+
+# Load necessary packages
+library(MASS)
+library(car)
+library(MVN)
+library(biotools)
+
+# Step 1: Prepare the dataset
+cleaned_data_da <- cleaned_data
+
+# Select numeric columns, excluding 'winner'
+X <- cleaned_data_da[, sapply(cleaned_data_da, is.numeric)]
+X <- X[, !names(X) %in% "winner"]
+
+# Combine predictors and target variable into a dataset
+clean_data <- cleaned_data_da[, c(names(X), "winner")]
+
+# Remove columns with missing data
+clean_data_no_missing <- clean_data[, colSums(is.na(clean_data)) == 0]
+
+# Separate predictors and target variable
+X_clean <- clean_data_no_missing[, sapply(clean_data_no_missing, is.numeric)]
+y_clean <- as.factor(clean_data_no_missing$winner)
+
+# Step 2: Check and remove constant variables
+constant_vars <- sapply(X_clean, function(col) {
+  var_true <- var(col[y_clean == "TRUE"], na.rm = TRUE)
+  var_false <- var(col[y_clean == "FALSE"], na.rm = TRUE)
+  return(var_true == 0 || var_false == 0)
+})
+X_clean <- X_clean[, !constant_vars]
+
+# Step 3: Test LDA Assumptions
+
+# 1. Check for normality of predictors
+cat("Multivariate Normality Test Results:\n")
+normality_test <- mvn(X_clean, mvnTest = "mardia")
+if (!is.null(normality_test$multivariateNormality)) {
+  print(normality_test$multivariateNormality)
+} else {
+  cat("Multivariate normality test did not return valid results.\n")
+}
+
+# 2. Check for equality of covariance matrices
+cat("\nEquality of Covariance Matrices Test Results:\n")
+cov_test <- boxM(X_clean, grouping = y_clean)
+if (!is.null(cov_test$p.value) && !is.na(cov_test$p.value)) {
+  print(cov_test)
+  if (cov_test$p.value < 0.05) {
+    cat("Warning: Equality of covariance matrices assumption may be violated.\n")
+  } else {
+    cat("Equality of covariance matrices assumption appears to be satisfied.\n")
+  }
+} else {
+  cat("Covariance matrices test did not return a valid p-value.\n")
+}
+
+# 3. Check for multicollinearity among predictors
+cat("\nVariance Inflation Factor (VIF) for Predictors:\n")
+tryCatch({
+  vif_model <- lm(y_clean ~ ., data = as.data.frame(X_clean))
+  vif_values <- vif(vif_model)
+  print(vif_values)
+  if (any(vif_values > 10)) {
+    cat("Warning: Multicollinearity detected among predictors.\n")
+  } else {
+    cat("No significant multicollinearity detected.\n")
+  }
+}, error = function(e) {
+  cat("Error in VIF calculation:", e$message, "\n")
+})
+
+# Step 4: Run LDA
+lda_model <- lda(y_clean ~ ., data = X_clean)
+cat("\nLDA Model Summary:\n")
+print(lda_model)
+
+# Step 5: Compute Misclassification Rate with 5-Fold Cross-Validation
+set.seed(42)  # For reproducibility
+folds <- sample(1:5, size = nrow(X_clean), replace = TRUE)
+misclassification_rates <- numeric(5)
+
+for (i in 1:5) {
+  # Split into training and test sets
+  train_indices <- which(folds != i)
+  test_indices <- which(folds == i)
+  
+  X_train <- X_clean[train_indices, ]
+  y_train <- y_clean[train_indices]
+  X_test <- X_clean[test_indices, ]
+  y_test <- y_clean[test_indices]
+  
+  # Train LDA on training set
+  lda_cv_model <- lda(y_train ~ ., data = as.data.frame(X_train))
+  
+  # Make predictions on test set
+  predictions <- predict(lda_cv_model, newdata = as.data.frame(X_test))$class
+  
+  # Calculate misclassification rate for this fold
+  misclassification_rates[i] <- mean(predictions != y_test)
+}
+
+# Calculate and print the overall misclassification rate
+cv_misclassification_rate <- mean(misclassification_rates)
+cat("\n5-Fold Cross-Validated Misclassification Rate:", cv_misclassification_rate, "\n")
+
+# Step 6: Rank Variables by Absolute Value of Coefficients
+coefficients_df <- as.data.frame(lda_model$scaling)
+coefficients_df$Variable <- rownames(coefficients_df)
+coefficients_df$AbsValue <- abs(coefficients_df[, 1])  # Assuming the first column contains the coefficients
+ranked_variables <- coefficients_df[order(-coefficients_df$AbsValue), ]
+
+# Print the top 10 most significant variables
+cat("\nTop 10 Most Significant Variables in LDA Model:\n")
+print(head(ranked_variables, 10))
+
+
+```
+
+Next, we instead fit a Quadratic Discriminant Analysis model on the data, making sure to include cross validation.QDA differs from LDA in terms of flexibility as it allows for different covariance matrices for each class. Due to the high multicolliniearity of the data, some transformations and dimension-reduction techniques must be applied in order to run the analysis. The below model specifically works by computing PCA on the initial numeric predictors, and then using the principal components of that PCA model as predictors in the discriminant analysis model. PCA is usful in addessing multicollinieart as the prinicpal components will always orthagonal/independent, and can be selected to capture a specific percentage of the variation within the data. However, PCA can also potentially lead to information loss if the retained components do not capture all relevant variance for group separation. By then using discriminant analysis on the prinicpal components, we can determine new multivariate directions in space which discriminate between winning and losing fights, allowing us to better understand how variation in predictors relates to differences in outcomes. It must also be noted that the discriminant functions also will not be as easily interpretable as if they had used the the variables directly rather than the principal components. Cross-validation meanwhile ensures the results are robust and generizable. The following code runs QDA, using a for-loop to determine the optimal number of components to include from the PCA in the QDA. The optimal number of components is determined to be 15, which leads to a misclassification rate of 0.38548, leading to an accuracy rate of approximately 61%. This is marginally worse than the LDA model and the logistic regression models, suggesting some information loss occuring.
+
+```{r, eval=FALSE,echo=FALSE}
+# Quadratic Discriminant Analysis (QDA) with  PCA and  5-Fold CV: Model Building and Evaluation
+# -----------------------------------------------------------------------------------
+
+# Initialize variables to track the optimal number of components and misclassification rate
+min_misclassification_rate <- Inf
+optimal_num_components <- 0
+
+# Define the maximum number of components to test
+max_components_to_test <- min(ncol(X_clean), 50)  # Adjust for efficiency
+misclassification_rates <- numeric(max_components_to_test)  # Preallocate vector
+
+# Loop through different numbers of principal components
+for (num_components in 1:max_components_to_test) {
+  set.seed(42)  # For reproducibility
+  
+  # Perform 5-fold cross-validation
+  folds <- createFolds(y_clean, k = 5, list = TRUE)  # Use 5 folds
+  misclassifications <- 0
+  
+  for (fold_indices in folds) {
+    # Partition the data into training and testing sets
+    X_train <- X_clean[-fold_indices, ]
+    y_train <- y_clean[-fold_indices]
+    X_test <- X_clean[fold_indices, ]
+    y_test <- y_clean[fold_indices]
+    
+    # Perform PCA on the training set only
+    pca <- prcomp(X_train, center = TRUE, scale. = TRUE)
+    
+    # Extract the first `num_components` principal components for training and testing
+    X_train_pca <- as.data.frame(pca$x[, 1:num_components])
+    X_test_pca <- as.data.frame(predict(pca, newdata = X_test)[, 1:num_components])
+    
+    # Rename principal component columns to avoid conflicts
+    colnames(X_train_pca) <- paste0("PC", 1:num_components)
+    colnames(X_test_pca) <- paste0("PC", 1:num_components)
+    
+    # Combine PCA-transformed data with the target variable
+    train_set <- cbind(X_train_pca, y_clean = y_train)
+    test_set <- cbind(X_test_pca, y_clean = y_test)
+    
+    # Train QDA model on the training set
+    qda_model <- qda(y_clean ~ ., data = train_set)
+    
+    # Predict on the test set
+    qda_prediction <- predict(qda_model, newdata = test_set)$class
+    
+    # Count misclassifications
+    misclassifications <- misclassifications + sum(qda_prediction != test_set$y_clean)
+  }
+  
+  # Calculate the misclassification rate
+  misclassification_rate <- misclassifications / length(y_clean)
+  
+  # Store the misclassification rate
+  misclassification_rates[num_components] <- misclassification_rate
+  
+  # Update the optimal number of components if this rate is lower
+  if (misclassification_rate < min_misclassification_rate) {
+    min_misclassification_rate <- misclassification_rate
+    optimal_num_components <- num_components
+  }
+}
+
+# Output the optimal number of components and the corresponding misclassification rate
+cat("Optimal Number of Components: ", optimal_num_components, "\n")
+cat("Minimum Misclassification Rate: ", min_misclassification_rate, "\n")
+
+# Plot misclassification rates against the number of components
+plot(1:max_components_to_test, misclassification_rates, type = "b",
+     xlab = "Number of Principal Components", ylab = "Misclassification Rate",
+     main = "Misclassification Rate vs. Number of Components")
+
+```
+
+Our final QDA model looks at implementing QDA without first filtering the variables through PCA. This would present issues if done directly as previously mentioned there is extreme amount of multicolliniearity among the predictor variables. As such, the below code checks for and removes linear dependencies by removing variables with high variance inflation factor scores, until all of the variables have VIF scores of less than 10, which is a standard rule of thumb. This ensures that variables which disproportionaly contribute to multicolliniearity are removed. This results in a final model of approximately 60 variables. Note that when running this code section, it takes a very long time to run due to the high number of starting variables, and the fact that VIF is context-dependent, which means it needs to be recalculated after each removed variable. It should also be noted that the r_odds variable, due to it's importance in predictive power, is excluded from being removed in order to ensure it remains in the final model. With a classifications rate of 0.4450, this model performs very poorly, and does worse than a model only including r_odds in order to make the prediction. This is somewhat suprising, as we would expect a QDA model based on the baseline variables to be mostly comparable to LDA results, or the combined PCA QDA results, but are starkly worse. It is possible that QDA might be more sensitive to violations of assumptions, as well as the idea that that the chosen predictors, even after cleaning, may lack strong relationships to the target. A potential alternative model which could be used in futture research could be using regularized discriminant analysis.
+
+```{r, include=FALSE}
+# Quadratic Discriminant Analysis (QDA) without PCA: Model Building and Evaluation
+# This code section implements QDA to predict fight outcomes (winning vs. losing) 
+# without dimensionality reduction techniques like PCA.
+# -----------------------------------------------------------------------------------
+
+# Step 1: Move 'r_odds' to the end of the dataset
+final_data_DA <- final_data[, sapply(final_data, is.numeric)]
+final_data_DA <- final_data_DA[, c(setdiff(names(final_data_DA), "r_odds"), "r_odds")]
+
+# Step 2: Remove constant variables
+final_data_DA <- final_data_DA[, sapply(final_data_DA, function(col) {
+  length(unique(col)) > 1
+})]
+
+# Step 3: Check for linear dependencies (multicollinearity)
+
+# Iteratively remove variables with VIF > 10, but skip 'r_odds'
+while (TRUE) {
+  vif_values <- calc_vif(final_data_DA[, -ncol(final_data_DA)])  # Exclude 'r_odds' for VIF calculation
+  max_vif <- max(vif_values, na.rm = TRUE)
+  if (max_vif > 10) {
+    # Remove the variable with the highest VIF
+    var_to_remove <- names(which.max(vif_values))
+    cat("Removing variable due to high VIF:", var_to_remove, "\n")
+    final_data_DA <- final_data_DA[, !names(final_data_DA) %in% var_to_remove]
+  } else {
+    break
+  }
+}
+
+# Step 4: Ensure predictors ≤ observations
+num_observations <- nrow(final_data_DA)
+num_predictors <- ncol(final_data_DA)
+
+if (num_predictors >= num_observations) {
+  # Remove less important variables (e.g., based on correlation with the target)
+  cor_with_target <- sapply(final_data_DA, function(col) cor(col, final_data$winner, use = "complete.obs"))
+  sorted_vars <- names(sort(abs(cor_with_target), decreasing = TRUE))
+  final_data_DA <- final_data_DA[, sorted_vars[1:(num_observations - 1)]]
+}
+
+# Add the target variable (assuming 'winner' is the target in final_data)
+final_data_DA$winner <- final_data$winner
+
+# Output summary of the final dataset
+cat("Final dataset for DA is ready. Dimensions:\n")
+cat("Number of Observations: ", nrow(final_data_DA), "\n")
+cat("Number of Predictors: ", ncol(final_data_DA) - 1, "\n")  # Exclude the target variable
+
+# Step 5: Remove missing values
+final_data_DA <- na.omit(final_data_DA)
+
+nzv <- nearZeroVar(final_data_DA, saveMetrics = TRUE)
+final_data_DA <- final_data_DA[, !nzv$nzv]
+cor_matrix <- cor(final_data_DA[, -ncol(final_data_DA)], use = "pairwise.complete.obs")  # Exclude 'winner'
+high_cor_vars <- findCorrelation(cor_matrix, cutoff = 0.9, names = TRUE)
+final_data_DA <- final_data_DA[, !names(final_data_DA) %in% high_cor_vars]
+
+
+# Step 6: Train QDA Model
+qda_model <- qda(winner ~ ., data = final_data_DA)
+
+# Summary of the model
+print(qda_model)
+
+# Step 7: Cross-Validation
+set.seed(42)
+folds <- createFolds(final_data_DA$winner, k = 5, list = TRUE)
+
+misclassification_rates <- numeric(length(folds))
+for (i in seq_along(folds)) {
+  test_indices <- folds[[i]]
+  train_data <- final_data_DA[-test_indices, ]
+  test_data <- final_data_DA[test_indices, ]
+  
+  # Train QDA model
+  qda_model <- qda(winner ~ ., data = train_data)
+  
+  # Predict on the test set
+  predictions <- predict(qda_model, newdata = test_data)
+  predicted_classes <- predictions$class
+  
+  # Calculate misclassification rate
+  misclassification_rates[i] <- mean(predicted_classes != test_data$winner)
+}
+
+average_misclassification_rate <- mean(misclassification_rates)
+cat("Average Misclassification Rate: ", average_misclassification_rate, "\n")
+
+
+```
+
+## ii. Machine Learning Models
+
+In the final part of the methods section, we take a look at two models aimed at improving the understanding we have of which variables, constructed or not, are important and helpful in predicting fight outcomes and provide unique information not otherwise captured.
+
+In the first model, we take a look using a random forest model in order to assess variable importance.The robustness of random forest models to overfitting ensures that the importance values derived are reliable and have extremely low bias and low variance. Notably, this is true even in datasets with many correlated predictors. In the final plot are two graphs which both emphasize two methods of assesing variable importance. Mean decrease in accuracy indicates how much the model's predictive accuracy declines when a variable is randomly permuted, reflecting its general contribution to prediction accuracy, while mean decrease in Gini impurity, on the other hand, highlights how much a variable reduces uncertainty in classification across splits. This provides an alternative perspective on importance. In both, r_odds as a predictor is far and away the most important useful predictor, likely due to its direct representation of pre-fight betting expectations, which naturally encapsulate a wealth of contextual information. However, the style matchup, activity score, and finishing score variables all appear to be relatively effective as well, and complement the odds by capturing additional stylistic and performance-based nuances, and suggests that they provide unique insights/new information. The differences between the random forest analysis and earlier analyses regarding variables like activity_score may indicate that non-linear relationships play a crucial role in predicting fight outcomes.
+
+```{r, echo=FALSE}
+# This code section trains a Random Forest model to assess variable importance for predicting UFC fight outcomes.
+# -----------------------------------------------------------------------------------
+
+# Ensure the target variable is a factor for classification
+final_data$winner <- as.factor(final_data$winner)
+
+# Define the formula for Random Forest
+rf_formula <- winner ~ r_odds + r_activity_score + b_activity_score + 
+  r_finishing_score + b_finishing_score + style_matchup + age_dif + 
+  b_total_rounds_fought + r_total_rounds_fought + b_wins + r_wins + 
+  b_height_cms + r_height_cms + b_reach_cms + r_reach_cms + 
+  b_current_win_streak + r_current_win_streak + r_current_lose_streak + 
+  b_current_lose_streak + b_avg_sig_str_landed + r_avg_sig_str_landed + 
+  b_avg_td_pct + r_avg_td_pct + r_wins_by_ko + b_wins_by_ko + 
+  r_wins_by_submission + b_wins_by_submission + 
+  r_wins_by_tko_doctor_stoppage + b_wins_by_tko_doctor_stoppage 
+
+# Train the Random Forest model
+set.seed(123)  # For reproducibility
+rf_model <- randomForest(
+  formula = rf_formula,
+  data = final_data,
+  ntree = 500,  # Number of trees
+  mtry = 5,     # Number of predictors sampled at each split
+  importance = TRUE
+)
+
+# Print model summary
+print("Random Forest Model Summary:")
+print(rf_model)
+
+# Variable importance analysis
+importance_values <- importance(rf_model)  # Extract importance values
+print("Variable Importance Values:")
+print(importance_values)
+
+# Visualize variable importance
+varImpPlot(
+  rf_model,
+  main = "Variable Importance in Random Forest",
+  n.var = min(15, nrow(importance_values))  # Show top variables (up to 20)
+)
+
+```
+
+Next, we take a look at a "boosting" model, which attempts to train a boosted tree model using the XGBoost package for binary classification. Boosting algorithms such as XGBoost are highly effective particularly in capturing non-linear relationships and interactions between variables. This is done by iteratively improving weak learners to create a stronger model, while being well-equpted to deal with large datasets and high dimensional spaces. This machine learning technique allows us an alternative way of measuring variable importance.The feature importance metrics generated by XGBoost are based on how often a feature is used to split data across all boosting rounds, as well as the improvement it provides to the model's performance. Two tables are included at the bottom. The first includes the relative importances of the created variables, and the second at all variables. It appears that the factor, activity, and finishing variables are particularly useful, with r_factor3 emerging as the most important created variable. While both Random Forest and XGBoost emphasize the importance of r_odds, it is intesting that XGBoost brings additional attention to predictors such as r_factor3. This potentially indicates a nuanced and speicifc difference in how the models interpret variable contributions, with the XGBoost model capturing latent patterns captured which are critical in determining fight outcomes. Meanwhile, the inclusion of the style_matchup variable suggests there is potential for trainers and analysts to focus on this as a means of increasing win probabilities. One limitation of XGBoost is its sensitivity to its hyperparameters, such as max_depth and eta, which can impact the stability of feature importance rankings. It is also important to note that these findings are not neccisiarly causal, and may simply be correlation. One area for potential future analysis could be investigating how chaning boosting parameters could influence the stability of feature importance ranking
+
+```{r, echo=FALSE}
+# This code section trains a boosted tree model using XGBoost for binary classification and evaluates feature importance.
+# -----------------------------------------------------------------------------------
+
+# Prepare the dataset for training
+# Extract features (X) and target (Y)
+X <- final_data[, -which(names(final_data) == "winner")]
+X <- X[, sapply(X, is.numeric)]  # Keep only numeric columns
+X <- X[, !grepl("odds|predict|expected", names(X))]  # Exclude columns with odds, predictions, or expectations
+
+Y <- as.numeric(final_data$winner) - 1  # Convert target to binary (0 for blue win, 1 for red win)
+
+# One-hot encode 'style_matchup'
+X$style_matchup <- as.factor(final_data$style_matchup)  # Ensure it's a factor
+X_encoded <- model.matrix(~ style_matchup - 1, data = final_data)  # One-hot encoding for 'style_matchup'
+
+# Combine one-hot encoded columns with the main dataset
+X <- cbind(X, X_encoded)
+
+# Split the data into training and testing sets
+set.seed(42)  # Ensure reproducibility
+trainIndex <- createDataPartition(Y, p = 0.8, list = FALSE)
+trainX <- X[trainIndex, ]
+trainY <- Y[trainIndex]
+testX <- X[-trainIndex, ]
+testY <- Y[-trainIndex]
+
+# Ensure only numeric features for training and testing datasets
+trainX_numeric <- trainX[, sapply(trainX, is.numeric)]  # Numeric features for training
+testX_numeric <- testX[, sapply(testX, is.numeric)]  # Numeric features for testing
+
+# Convert to DMatrix format for XGBoost
+train_data <- xgb.DMatrix(data = as.matrix(trainX_numeric), label = trainY)
+test_data <- xgb.DMatrix(data = as.matrix(testX_numeric), label = testY)
+
+# Set parameters for binary classification
+params <- list(
+  objective = "binary:logistic",  # Binary classification objective
+  eval_metric = "error",          # Evaluation metric: classification error
+  max_depth = 6,                  # Maximum tree depth
+  eta = 0.1,                      # Learning rate
+  nthread = 2                     # Number of threads
+)
+
+# Train the XGBoost model
+set.seed(42)
+boosted_model <- xgb.train(
+  params = params,
+  data = train_data,
+  nrounds = 80,  # Number of boosting rounds
+  watchlist = list(train = train_data, test = test_data),
+  verbose = 0
+)
+
+# Evaluate feature importance
+importance_matrix <- xgb.importance(feature_names = colnames(trainX_numeric), model = boosted_model)
+
+# Plot the feature importance
+xgb.plot.importance(importance_matrix, main = "Feature Importance in Boosted Model")
+
+# Display only the top 15 most important features
+xgb.plot.importance(importance_matrix[1:15, ], main = "Top 15 Feature Importance in Boosted Model")
+
+# Add ranking to the feature importance matrix
+importance_matrix$Rank <- rank(-importance_matrix$Importance, ties.method = "first")
+
+# Filter and display important features related to activity, finishing, style, or fights
+filtered_importance <- importance_matrix[
+  grepl("activity|finishing|style|diff_30|prior_fights|factor", importance_matrix$Feature),
+  c("Feature", "Importance", "Rank")
+]
+
+# Display filtered importance matrix
+print("Filtered Feature Importance:")
+print(filtered_importance)
+
+# Display full importance matrix with ranks
+print("Full Feature Importance with Ranks:")
+print(importance_matrix[, c("Feature", "Importance", "Rank")])
+
+# Check for missing values in the dataset
+missing_values <- list(
+  "Column-wise NAs" = colSums(is.na(X)),
+  "Row-wise NAs" = rowSums(is.na(X))
+)
+
+# Display missing values summary
+#print("Missing Values Summary:")
+# print(missing_values)
+
+
+```
+
+
+\newpage
+
+# Results
+
+Finally, we will analyze the effectiveness of the logistic regression model changes. Notably, they all perform better at predicting than the discriminant models, and so they will remain the focus of this section. The models accuracy is tested by assigning a predicted winner for each model according to whether or not the predicted chance of a red victory is greater than 0.5. These predictions are compared to the actual model. As can be seen, the model with the highest accuracy according to this metric is in fact the super_model, notably even outperforming the stepwise model.
+
+## i. Logistic Model accuracy
+
+The below code attempts to assertain model accuracy of the previously constructed logistic regression models by comparing their predictions against the actual fight outcomes. The evaluation includes both accuracy metrics and a detailed comparison of model choices to the implied odds from betting markets. The "mismatch" analysis, in which models suggest favorites should be different than the betting on predictions, highlight instances where the model diverges significantly from market expectations. These mismatches, particularly when the model exhibits large gaps, may indicate opportunities to identify undervalued bets or to understand discrepancies between statistical and human analyses. The mismatch analysis however, assumes that the betting market odds are a reasonable baseline for comparison, which may not be true if the odds are heavily influenced by public opinion or other non-statistical factors. A common example of this is fans betting on their favorite fighters even in match ups that are unfavorable. Although not included in the scope of this analysis, it is also possible to look at large gaps in predicted odds in fights where both models aggree on which fighter should be the favorite. The results suggest that the super_model not only improves prediction accuracy but also identifies fights where its predictions diverge meaningfully (Predicting with >60%) from market odds. This could have implications for decision-making in betting, coaching strategies, or fight analysis. Finally, this analysis confirms the importance of the constructed variables, such as style_matchup and activity scores, in improving model predictions. As all models were cross-validated when constructed, these results should be robust. Thus, the novel variables provide domain-specific insights into fight dynamics and highlight the value of integrating expert knowledge, such as the "styles make fights" principal, into model design.
+
+```{r, echo=FALSE}
+# This section evaluates logistic regression models by generating predicted odds, 
+# identifying mismatches with implied odds, and calculating model accuracies.
+# It also analyzes extreme confidence differences in predictions for the "super" model.
+# -----------------------------------------------------------------------------------
+
+# Generate predicted odds for each logistic regression model
+final_data <- final_data %>%
+  mutate(
+    predicted_odds_style_matchup = if (inherits(lm_style_matchup, "train")) {
+      predict(lm_style_matchup, newdata = final_data, type = "prob")[, 2]
+    } else {
+      predict(lm_style_matchup, newdata = final_data, type = "response")
+    },
+    predicted_odds_activity = if (inherits(lm_activity, "train")) {
+      predict(lm_activity, newdata = final_data, type = "prob")[, 2]
+    } else {
+      predict(lm_activity, newdata = final_data, type = "response")
+    },
+    predicted_odds_finishing = if (inherits(lm_finishing, "train")) {
+      predict(lm_finishing, newdata = final_data, type = "prob")[, 2]
+    } else {
+      predict(lm_finishing, newdata = final_data, type = "response")
+    },
+    predicted_odds_age = if (inherits(lm_35_curse, "train")) {
+      predict(lm_35_curse, newdata = final_data, type = "prob")[, 2]
+    } else {
+      predict(lm_35_curse, newdata = final_data, type = "response")
+    },
+    predicted_odds_super = if (inherits(lm_super, "train")) {
+      predict(lm_super, newdata = final_data, type = "prob")[, 2]
+    } else {
+      predict(lm_super, newdata = final_data, type = "response")
+    },
+    predicted_odds_stepwise = if (inherits(lm_stepwise, "train")) {
+      predict(lm_stepwise, newdata = final_data, type = "prob")[, 2]
+    } else {
+      predict(lm_stepwise, newdata = final_data, type = "response")
+    },
+    predicted_odds_style = if (inherits(lm_style, "train")) {
+      predict(lm_style, newdata = final_data, type = "prob")[, 2]
+    } else {
+      predict(lm_style, newdata = final_data, type = "response")
+    }
+  )
+
+final_data <- final_data %>%
+  mutate(
+    r_odds_pick = ifelse(r_odds >= 0.5, "Red", "Blue"),
+    style_matchup_pick = ifelse(predicted_odds_style_matchup > 0.5, "Red", "Blue"),
+    activity_pick = ifelse(predicted_odds_activity > 0.5, "Red", "Blue"),
+    finishing_pick = ifelse(predicted_odds_finishing > 0.5, "Red", "Blue"),
+    age_pick = ifelse(predicted_odds_age > 0.5, "Red", "Blue"),
+    super_pick = ifelse(predicted_odds_super > 0.5, "Red", "Blue"),
+    stepwise_pick = ifelse(predicted_odds_stepwise > 0.5, "Red", "Blue"),
+    style_pick = ifelse(predicted_odds_style > 0.5, "Red", "Blue")
+  )
+
+# Identify mismatches for each model
+mismatch_results <- list(
+  style_matchup = final_data %>%
+    filter(r_odds_pick != style_matchup_pick) %>%
+    dplyr::select(r_odds, predicted_odds_style_matchup, r_odds_pick, style_matchup_pick),
+  activity = final_data %>%
+    filter(r_odds_pick != activity_pick) %>%
+    dplyr::select(r_odds, predicted_odds_activity, r_odds_pick, activity_pick),
+  finishing = final_data %>%
+    filter(r_odds_pick != finishing_pick) %>%
+    dplyr::select(r_odds, predicted_odds_finishing, r_odds_pick, finishing_pick),
+  age = final_data %>%
+    filter(r_odds_pick != age_pick) %>%
+    dplyr::select(r_odds, predicted_odds_age, r_odds_pick, age_pick),
+  super = final_data %>%
+    filter(r_odds_pick != super_pick) %>%
+    dplyr::select(winner, r_fighter, b_fighter, r_odds, predicted_odds_super, r_odds_pick, super_pick),
+  stepwise = final_data %>%
+    filter(r_odds_pick != stepwise_pick) %>%
+    dplyr::select(r_odds, predicted_odds_stepwise, r_odds_pick, stepwise_pick),
+  style = final_data %>%
+    filter(r_odds_pick != style_pick) %>%
+    dplyr::select(r_odds, predicted_odds_style, r_odds_pick, style_pick)
+)
+
+# Add binary predictions for accuracy calculations
+final_data <- final_data %>%
+  mutate(
+    r_odds_prediction = ifelse(r_odds >= 0.5, T, F),
+    style_matchup_prediction = ifelse(predicted_odds_style_matchup > 0.5, T, F),
+    activity_prediction = ifelse(predicted_odds_activity > 0.5, T, F),
+    finishing_prediction = ifelse(predicted_odds_finishing > 0.5, T, F),
+    age_prediction = ifelse(predicted_odds_age > 0.5, T, F),
+    super_prediction = ifelse(predicted_odds_super > 0.5, T, F),
+    stepwise_prediction = ifelse(predicted_odds_stepwise > 0.5, T, F),
+    style_prediction = ifelse(predicted_odds_style > 0.5, T, F)
+  )
+
+# Calculate accuracy for each model
+accuracy_results <- data.frame(
+  Model = c("r_odds", "Style Matchup", "Activity", "Finishing", "Age > 35", "Stepwise", "Style","Super"),
+  Accuracy = c(
+    mean(final_data$r_odds_prediction == final_data$winner),
+    mean(final_data$style_matchup_prediction == final_data$winner),
+    mean(final_data$activity_prediction == final_data$winner),
+    mean(final_data$finishing_prediction == final_data$winner),
+    mean(final_data$age_prediction == final_data$winner),
+    mean(final_data$stepwise_prediction == final_data$winner),
+    mean(final_data$style_prediction == final_data$winner),
+    mean(final_data$super_prediction == final_data$winner)
+  )
+)
+
+# Convert accuracy to percentages and round
+accuracy_results$Accuracy <- round(accuracy_results$Accuracy * 100, 2)
+
+mismatch_super <- final_data %>%
+  filter(r_odds_pick != super_pick) %>%
+  dplyr::select(winner,r_fighter,b_fighter,r_odds, predicted_odds_super, r_odds_pick, super_pick)
+
+
+difs <- mismatch_super[mismatch_super$predicted_odds_super<0.49|mismatch_super$predicted_odds_super>0.51,]
+big_difs <- mismatch_super[mismatch_super$predicted_odds_super<0.4|mismatch_super$predicted_odds_super>0.6,]
+diff_choices <-  nrow(difs)/nrow(final_data)
+big_diff_choices <- nrow(big_difs)/nrow(final_data)
+
+
+
+# Display accuracy results
+print("Model Accuracy Summary:")
+print(accuracy_results)
+
+print(paste("% of time super model makes a different choice compared to the odds model", round(diff_choices * 100, 2), "%"))
+print(paste("% of time super model makes a different choice, with extreme confidence (20% difference)", round(big_diff_choices * 100, 2), "%"))
+
+
+```
+
+From now on, analysis will be focused on the simple base odds model, and the super model. The above accuracy mechanism is weak in one area, in that it does provide additional benefit to being very confident on high predictions. Relying on a simple threshold (0.5) for predictions may not capture the uncertainty in close fights, or certainty in fights that should not be close. A correct predicted odds of 0.6 has the same function as predicting the odds to be 0.9. The following code attempts to correct this in two potential ways. In the first, log likelihood values for both the odds model and the super model are measured, finding that the super model maintains a higher log likelihood according to the data. In the second it is observed that the super model obtains a lower mean absolute deviation of prediction as compared to th odds model. Both of these results suggest that the super model outperforms the betting odds model, but this will be tested in the following section.
+
+```{r, echo=FALSE}
+# This code section calculates and compares the log-likelihoods and average absolute deviations
+# for the implied odds and model-predicted probabilities.
+# -----------------------------------------------------------------------------------
+
+# Ensure the 'winner' column is numeric (convert TRUE/FALSE or factor levels to 1/0)
+final_data <- final_data %>%
+  mutate(
+    winner_numeric = case_when(
+      winner == T ~ 1,     # Replace "Red" with the appropriate label
+      winner == F ~ 0,    # Replace "Blue" with the appropriate label
+      TRUE ~ NA_real_          # Ensure any unexpected values become NA
+    )
+  )
+
+
+# Calculate log-likelihoods for implied odds and predicted probabilities
+odds_log_likelihood <- log_likelihood(final_data$winner_numeric, final_data$r_odds)
+predicted_log_likelihood <- log_likelihood(final_data$winner_numeric, final_data$predicted_odds_super)
+
+# Print log-likelihood comparison
+cat("Log-likelihood for implied odds:", round(odds_log_likelihood, 4), "\n")
+cat("Log-likelihood for model predictions:", round(predicted_log_likelihood, 4), "\n")
+
+# Calculate mean absolute deviation (confidence measure)
+odds_deviation <- mean(abs(final_data$winner_numeric - final_data$r_odds), na.rm = TRUE)
+predicted_deviation <- mean(abs(final_data$winner_numeric - final_data$predicted_odds_super), na.rm = TRUE)
+
+# Print deviation comparison
+cat("Mean absolute deviation for implied odds:", round(odds_deviation, 4), "\n")
+cat("Mean absolute deviation for model predictions:", round(predicted_deviation, 4), "\n")
+
+```
+
+Next, we perform a likelihood ratio rest in order to compare the odds model and the super model. This is done in order to determine if the differences between the two models are statistically signifcantly different. The likelihood ratio test demonstrates that the difference in log-likelihood for the two models is statistically signficant, providing evidence that the super model presents an signficant increase in predictive power over the betting odds.
+
+```{r, echo=FALSE}
+# This code section performs a likelihood ratio test to compare the fit of two models: a simpler model and a more complex model.
+# -----------------------------------------------------------------------------------
+ model_0 <- glm(winner ~ r_odds, family = binomial, data = final_data)  # simpler model
+model_1 <- lm_super
+
+# Extract the log-likelihoods from each model
+logLik_0 <- logLik(model_0)  # Simpler model
+logLik_1 <- logLik(model_1)  # Complex model
+
+# Calculate the likelihood ratio statistic
+LR_stat <- 2 * (logLik_1 - logLik_0)
+
+# Degrees of freedom: difference in the number of parameters between models
+df <- attr(logLik_1, "df") - attr(logLik_0, "df")
+
+# Calculate the p-value using the chi-square distribution
+p_value <- pchisq(LR_stat, df = df, lower.tail = FALSE)
+
+# Output the results
+cat("Log-Likelihood for Model 0:", round(logLik_0, 4), "\n")
+cat("Log-Likelihood for Model 1:", round(logLik_1, 4), "\n")
+cat("Likelihood Ratio Statistic:", round(LR_stat, 4), "\n")
+cat("Degrees of Freedom:", df, "\n")
+cat("p-value:", round(p_value, 4), "\n")
+
+# Interpretation of results
+if (p_value < 0.05) {
+  cat("The difference in likelihood is statistically significant at the 5% level.\n")
+} else {
+  cat("The difference in likelihood is not statistically significant at the 5% level.\n")
+}
+
+
+```
+
+As much of the strength of the super model comes from the inclusion of the stepwise regression selected variables, then it is important to test whether or not the novel variables signifcantly produce a benefit in accuracy over the stepwise model. 
+
+```{r}
+# This code section calculates and compares the log-likelihoods, average absolute deviations,
+# and performs a likelihood ratio test between the stepwise model and the super model.
+# -----------------------------------------------------------------------------------
+
+
+
+
+# Calculate log-likelihoods for predicted probabilities (stepwise and super models)
+stepwise_log_likelihood <- log_likelihood(final_data$winner_numeric, final_data$predicted_odds_stepwise)
+super_log_likelihood <- log_likelihood(final_data$winner_numeric, final_data$predicted_odds_super)
+
+# Print log-likelihood comparison
+cat("Log-likelihood for stepwise model:", round(stepwise_log_likelihood, 4), "\n")
+cat("Log-likelihood for super model:", round(super_log_likelihood, 4), "\n")
+
+# Calculate mean absolute deviation (confidence measure)
+stepwise_deviation <- mean(abs(final_data$winner_numeric - final_data$predicted_odds_stepwise), na.rm = TRUE)
+super_deviation <- mean(abs(final_data$winner_numeric - final_data$predicted_odds_super), na.rm = TRUE)
+
+# Print deviation comparison
+cat("Mean absolute deviation for stepwise model:", round(stepwise_deviation, 4), "\n")
+cat("Mean absolute deviation for super model:", round(super_deviation, 4), "\n")
+
+# Perform likelihood ratio test
+model_stepwise <- lm_stepwise # simpler model
+model_super <- lm_super  # Complex model
+
+# Extract the log-likelihoods from each model
+logLik_stepwise <- logLik(model_stepwise)  # Simpler model
+logLik_super <- logLik(model_super)  # Complex model
+
+# Calculate the likelihood ratio statistic
+LR_stat <- 2 * (logLik_super - logLik_stepwise)
+
+# Degrees of freedom: difference in the number of parameters between models
+df <- attr(logLik_super, "df") - attr(logLik_stepwise, "df")
+
+# Calculate the p-value using the chi-square distribution
+p_value <- pchisq(LR_stat, df = df, lower.tail = FALSE)
+
+# Output the results
+cat("Log-Likelihood for Stepwise Model:", round(logLik_stepwise, 4), "\n")
+cat("Log-Likelihood for Super Model:", round(logLik_super, 4), "\n")
+cat("Likelihood Ratio Statistic:", round(LR_stat, 4), "\n")
+cat("Degrees of Freedom:", df, "\n")
+cat("p-value:", round(p_value, 4), "\n")
+
+# Interpretation of results
+if (p_value < 0.05) {
+  cat("The difference in likelihood is statistically significant at the 5% level.\n")
+} else {
+  cat("The difference in likelihood is not statistically significant at the 5% level.\n")
+}
+
+# Compare AIC for stepwise and super models
+aic_stepwise <- AIC(model_stepwise)
+aic_super <- AIC(lm_super)
+
+# Print the AIC values
+cat("AIC for Stepwise Model:", round(aic_stepwise, 4), "\n")
+cat("AIC for Super Model:", round(aic_super, 4), "\n")
+
+```
+
+
+The results indicate that while the super model achieves a slightly better fit to the data compared to the stepwise model, as evidenced by its higher log-likelihood (-1977.503 vs. -1999.2) and lower mean absolute deviation (0.4142 vs. 0.4199), the improvement is not statistically significant. The likelihood ratio statistic (43.3951) with 51 degrees of freedom yields a p-value of 0.7664, which is far above the 0.05 significance threshold. Therefore, there is insufficient evidence to conclude that the super model provides a significantly better fit than the stepwise model, suggesting that the added complexity of the super model may not be justified.
+
+The results also show that the stepwise model achieves a lower AIC (4048.4) compared to the super model (4107.005), indicating that the stepwise model provides a better balance between model fit and complexity. While the super model has a slightly higher log-likelihood and lower mean absolute deviation, its higher AIC suggests that the additional parameters may not add substantial predictive value. Combined with the non-significant p-value from the likelihood ratio test (0.7664), these findings further support that the increased complexity of the super model may not be warranted.
+
+
+
+
+
+
+## ii. Accuracy changes based on 2017 rule change
+
+In the final part of this section, we look to analyze the impact of the recent major changes to the offical judges' scoring criteria, which was implemented on 1/1/2017 (Raimondi). It is possible that the changes to the rules, which aimed to make judging more clear and consistent by emphasizing effective striking and grappling, will help our model predict better by improving the quality and consistentcy of judges' decisions. Although the gap in accuracy between the super model and the r_odds model appears to widen in the post-2017 period, the lack of statistical significance (p-value \> 0.05) suggests that this observed change could be due to random variation rather than a definitive effect of the rule changes. More data would be helpful in determining if recent fights have resulted in further changes to the accuracy gap. Potential future research could involve applying a regression discontunity approach to this and subsetting for fights that went to decision rather than including all fights could also help to determine the true effective of the changes.
+
+```{r, echo=FALSE}
+# This code section evaluates the impact of the 2017 rule change on model accuracy and computes statistical tests for accuracy gaps.
+# -----------------------------------------------------------------------------------
+
+# Split the dataset into pre-2017 and post-2017 subsets
+pre2017_data <- final_data %>%
+  filter(date < as.Date("2017-01-01"))
+
+post2017_data <- final_data %>%
+  filter(date >= as.Date("2017-01-01"))
+
+# Add prediction columns for each model
+# Pre-2017 Data
+pre2017_data <- pre2017_data %>%
+  mutate(
+    r_odds_prediction = ifelse(r_odds >= 0.5, 1, 0),
+    super_prediction = ifelse(predicted_odds_super > 0.5, 1, 0)
+  )
+
+# Post-2017 Data
+post2017_data <- post2017_data %>%
+  mutate(
+    r_odds_prediction = ifelse(r_odds >= 0.5, 1, 0),
+    super_prediction = ifelse(predicted_odds_super > 0.5, 1, 0)
+  )
+
+# Calculate accuracy for each model
+accuracy_r_odds_pre2017 <- mean(pre2017_data$r_odds_prediction == pre2017_data$winner_numeric)
+accuracy_super_pre2017 <- mean(pre2017_data$super_prediction == pre2017_data$winner_numeric)
+
+accuracy_r_odds_post2017 <- mean(post2017_data$r_odds_prediction == post2017_data$winner_numeric)
+accuracy_super_post2017 <- mean(post2017_data$super_prediction == post2017_data$winner_numeric)
+
+# Output accuracy results
+cat("Accuracy before 2017:\n")
+cat("Accuracy of r_odds (pre-2017):", round(accuracy_r_odds_pre2017 * 100, 2), "%\n")
+cat("Accuracy of super model (pre-2017):", round(accuracy_super_pre2017 * 100, 2), "%\n\n")
+
+cat("Accuracy after 2017:\n")
+cat("Accuracy of r_odds (post-2017):", round(accuracy_r_odds_post2017 * 100, 2), "%\n")
+cat("Accuracy of super model (post-2017):", round(accuracy_super_post2017 * 100, 2), "%\n\n")
+
+# Calculate accuracy changes
+accuracy_change_r_odds <- accuracy_r_odds_post2017 - accuracy_r_odds_pre2017
+accuracy_change_super <- accuracy_super_post2017 - accuracy_super_pre2017
+
+cat("Accuracy change:\n")
+cat("Change in r_odds accuracy:", round(accuracy_change_r_odds * 100, 2), "%\n")
+cat("Change in super model accuracy:", round(accuracy_change_super * 100, 2), "%\n\n")
+
+# Sample sizes
+n_pre <- nrow(pre2017_data)
+n_post <- nrow(post2017_data)
+
+# Compute accuracy gaps
+gap_pre <- accuracy_super_pre2017 - accuracy_r_odds_pre2017
+gap_post <- accuracy_super_post2017 - accuracy_r_odds_post2017
+gap_change <- gap_post - gap_pre
+
+# Compute standard errors
+se_pre <- sqrt((accuracy_super_pre2017 * (1 - accuracy_super_pre2017)) / n_pre +
+               (accuracy_r_odds_pre2017 * (1 - accuracy_r_odds_pre2017)) / n_pre)
+se_post <- sqrt((accuracy_super_post2017 * (1 - accuracy_super_post2017)) / n_post +
+                (accuracy_r_odds_post2017 * (1 - accuracy_r_odds_post2017)) / n_post)
+se_gap_change <- sqrt(se_pre^2 + se_post^2)
+
+# Compute Z-statistic and p-value
+z_gap_change <- gap_change / se_gap_change
+p_gap_change <- 2 * (1 - pnorm(abs(z_gap_change)))  # Two-tailed test
+
+# Output gap analysis
+cat("Pre-2017 accuracy gap:", round(gap_pre * 100, 2), "%\n")
+cat("Post-2017 accuracy gap:", round(gap_post * 100, 2), "%\n")
+cat("Change in accuracy gap:", round(gap_change * 100, 2), "%\n")
+cat("Z-statistic for change in accuracy gap:", round(z_gap_change, 2), "\n")
+cat("P-value for change in accuracy gap:", round(p_gap_change, 4), "\n")
+
+```
+
+
+
+\newpage
+
+# Conclusion
+
+The primary goal of this paper was to explore the MMA and UFC betting market in order to determine if it was efficient, or if it could be improved upon with novel variables and new statistical techniques. This was done using a myriad of stasitical and machine learning techniques, namely k-means and hierarchial clusrering, factor analysis, logistic regression, prinicpal components analysis, discriminant analysis, , random forest models, and boosting algorithms, among others.
+
+Under the goal of creating novel metrics that detect new information not yet including in betting market lines. To that extent, it can be argued at this analysis was successful. Although very few of the individual metrics were statistically signficant, when the novel metrics were appended onto a stepwise regresion model, the final model resulted in the highest obserbed prediction accuracy rate. Cross validation was employed at every step, ensuring that the results of this are robust and generalizeable to unseen data. The improvement of the super model as compared to the model built off of the odds alone was deemed statistically signficant using a likelihood ration test. Integrating style-based metrics and derived scores (e.g., activity, finishing) added depth not captured by betting odds by building off of expert knowledge in order to models that better matched with the consensus theory of what contributes to fight outcomes. This implies that publicly available information isn't completely leveraged by bettors. However, our analysis indicated that although the super model achieved lower log-likelihood and mean absolute deviation values, the difference between the stepwise and super models was not statistically significant according to a likelihood ratio test. When combined with the fact that the stepwise model also had a lower AIC, this suggests that the added complexity of the super model in the additional novel variables may have less benefit than previously understood. This may be the result of the "style_matchup" variables large number of classes, raising what would be a difference of 16 to a difference of 51. 
+
+The results of these findings can be used by analysts, bettors, or coaches in order to gain a competitive edge, such as through identifying undervalued fighters or understanding the interplay between fighter style and performance outcomes. For example, both activity score metrics were very statistically signifcant even when accounting for the odds, suggesting a discontinuity between the broader public's percieved importance of activeness in fighting and the true importance. However, it is possible that these findings could be improved upon in future work. The exclusion of draws, and the lack of more recent fights in the final merged data set indicate that more data could be scraped in order to improve our analysis. Additionally, many of the resulting models still face the risk of overfitting, which could be problematic if the historic data the models are fit on are no longer relavent or equivelent to today's fighters.
+
+Overall, while the betting odds provide a strong baseline, our carefully engineered variables can yield statistically and practically meaningful improvements in predictive accuracy. This is illumunating when it comes to understanding the value of a data-driven and analytics approach to understanding MMA fight outcomes, or sports outcomes more broadly, jopefully setting the stage for ongoing innovation in this domain.
+
+
+\newpage
+
+# Works Cited
+
+Gramm \*, Marshall, and Douglas H. Owens. “Determinants of Betting Market Efficiency.” *Applied Economics Letters*, vol. 12, no. 3, Feb. 2005, pp. 181–85, https://doi.org/10.1080/1350485042000314352. Accessed 26 Mar. 2020.
+
+Hlavac, Marek (2022). stargazer: Well-Formatted Regression and Summary Statistics Tables. R package version 5.2.3. https://CRAN.R-project.org/package=stargazer.
+
+Holmes, Benjamin, et al. “A Markov Chain Model for Forecasting Results of Mixed Martial Arts Contests.” *International Journal of Forecasting*, vol. 39, no. 2, Feb. 2022, https://doi.org/10.1016/j.ijforecast.2022.01.007. Accessed 30 May 2022.
+
+Kirk, Christopher. “THE INFLUENCE of AGE and ANTHROPOMETRIC VARIABLES on WINNING and LOSING in PROFESSIONAL MIXED MARTIAL ARTS.” *Facta Universitatis, Series: Physical Education and Sport*, vol. 0, no. 0, 2016, pp. 227–36, casopisi.junis.ni.ac.rs/index.php/FUPhysEdSport/article/view/2070. Accessed 5 Dec. 2024.
+
+Robbins, Thomas R. “Weak Form Efficiency in Sports Betting Markets.” *American Journal of Management*, vol. 23, no. 2, 2023, articlearchives.co/index.php/AJM/article/view/1634. Accessed 3 Dec. 2024.
+
+Stanhope, Stephen. “Are Money Line Odds in UFC Matches Calibrated? Evidence from Events in 2019–2020.” *SSRN Electronic Journal*, 2021, https://doi.org/10.2139/ssrn.3906072. Accessed 5 Mar. 2023.
+
+WOODLAND, LINDA M., and BILL M. WOODLAND. “Market Efficiency and the Favorite-Longshot Bias: The Baseball Betting Market.” *The Journal of Finance*, vol. 49, no. 1, Mar. 1994, pp. 269–79, https://doi.org/10.1111/j.1540-6261.1994.tb04429.x.
